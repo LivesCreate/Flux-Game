@@ -35,14 +35,6 @@ Blackjack · Higher/Lower · Lucky Slots · Coin Ladder · Memory Match · Mines
 - **Dark Theme** — multiple background presets and themes
 - **Offline Support** — service worker caches the app for offline play
 
-## Tech Stack
-
-- **Frontend:** React 18 (single-file deployment, no build tools)
-- **Backend:** Firebase (Auth, Firestore, cloud saves)
-- **Hosting:** GitHub Pages (web), Capacitor (Android APK)
-- **Monitoring:** Sentry error tracking
-- **AI:** Built entirely with Claude AI (Anthropic)
-
 ## File Structure
 
 | File | Purpose |
