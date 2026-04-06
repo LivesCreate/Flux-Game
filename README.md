@@ -35,18 +35,6 @@ Blackjack · Higher/Lower · Lucky Slots · Coin Ladder · Memory Match · Mines
 - **Dark Theme** — multiple background presets and themes
 - **Offline Support** — service worker caches the app for offline play
 
-## File Structure
-
-| File | Purpose |
-|------|---------|
-| `index.html` | The entire app — all React components, game logic, styles, and UI in one file |
-| `sw.js` | Service worker for offline caching |
-| `version.txt` | Current version number (checked by the app for updates) |
-| `news.json` | Developer news feed shown in-app |
-| `manifest.json` | PWA manifest for install-to-homescreen |
-| `icon-192.png` | App icon (192×192) |
-| `icon-512.png` | App icon (512×512) |
-
 ## Architecture Notes
 
 - **Single-file React app** — everything lives in `index.html` (~17,800 lines). No JSX compilation, no bundler. Components are written with `React.createElement` calls directly.
