@@ -14,12 +14,15 @@
 <meta name="browsermode" content="application">
 <meta name="screen-orientation" content="portrait">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}</style>
-<script src="react.production.min.js"></script>
-<script>if(typeof React==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"><\/script>');}</script>
-<script src="react-dom.production.min.js"></script>
-<script>if(typeof ReactDOM==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"><\/script>');}</script>
+<script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div id="flux-loader" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050508;font-family:-apple-system,BlinkMacSystemFont,sans-serif">
@@ -37,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.6";
+const VERSION = "v5.1.9";
 
 /* Sentry Error Monitoring */
 try {
@@ -162,6 +165,9 @@ const SLOT_PAY = {
   "🎰": 40
 };
 const CSS = `
+/* Safe-area padding for fixed overlays — prevents close buttons hiding under notch */
+[style*="inset:0"][style*="display:flex"][style*="position:fixed"],
+[style*="inset: 0"][style*="display: flex"][style*="position: fixed"]{padding-top:env(safe-area-inset-top,0px) !important;padding-bottom:env(safe-area-inset-bottom,0px) !important;box-sizing:border-box !important}
 html,body,:root{scrollbar-width:none !important;-ms-overflow-style:none !important}
 ::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important;background:transparent !important}
 *::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important}
@@ -14687,6 +14693,7 @@ function FluxApp() {
   const [authMode, setAuthMode] = useState("main");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDevConsole, setShowDevConsole] = useState(false);
+  const [devTapHint, setDevTapHint] = useState(0);
   const [recentGames, setRecentGames] = useState(function() { try { var r = localStorage.getItem("flux_recent"); return r ? JSON.parse(r) : []; } catch(e) { return []; } });
   const [showShop, setShowShop] = useState(false);
   const [ownedItems, setOwnedItems] = useState(save.ownedItems || []);
@@ -16752,7 +16759,7 @@ function FluxApp() {
       opacity: 0.5,
       fontFamily: "'JetBrains Mono',monospace"
     }
-  }, "FluxBucks ", /*#__PURE__*/React.createElement("span", { onClick: function() { if (!window._devTaps) window._devTaps = 0; window._devTaps++; if (window._devTaps >= 5) { setShowDevConsole(true); window._devTaps = 0; } clearTimeout(window._devTapTimer); window._devTapTimer = setTimeout(function() { window._devTaps = 0; }, 2000); } }, VERSION))), showResetConfirm && /*#__PURE__*/React.createElement("div", {
+  }, "FluxBucks ", /*#__PURE__*/React.createElement("span", { onClick: function() { if (!window._devTaps) window._devTaps = 0; window._devTaps++; setDevTapHint(window._devTaps); if (window._devTaps >= 5) { setShowDevConsole(true); window._devTaps = 0; setDevTapHint(0); } clearTimeout(window._devTapTimer); window._devTapTimer = setTimeout(function() { window._devTaps = 0; setDevTapHint(0); }, 2000); } }, VERSION, devTapHint >= 3 && devTapHint < 5 && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, color: "#c084fc", marginLeft: 6, fontFamily: "'JetBrains Mono',monospace", animation: "fadeUp 0.2s" } }, " (" + (5 - devTapHint) + " more)")))), showResetConfirm && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -17191,7 +17198,6 @@ function FluxApp() {
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Skip game card animations.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setQuickPlay(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: quickPlay ? "var(--green)" : "var(--surface)", border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
         /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
-
     /* ═══ Tap Outside to Close ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -17693,7 +17699,7 @@ function FluxApp() {
   )),
   /* ═══ EMERGENCY CLOSE (soft-lock recovery) ═══ */
   showEmergencyClose && /*#__PURE__*/React.createElement("div", {
-    style: { position: "fixed", top: 8, left: "50%", transform: "translateX(-50%)", zIndex: 99999, animation: "fadeUp 0.3s" }
+    style: { position: "fixed", top: "calc(12px + env(safe-area-inset-top, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 99999, animation: "fadeUp 0.3s" }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: closeAllOverlays,
     style: { padding: "10px 20px", borderRadius: 12, fontSize: 13, fontWeight: 800, background: "var(--accent)", color: "#fff", border: "2px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 24px rgba(255,94,120,0.5)", letterSpacing: 0.5 }
@@ -17789,29 +17795,12 @@ function Wrap({
   }, children));
 }
 
-/* Dynamic Sentry loading for APK (non-blocking) */
-setTimeout(function() {
-  try {
-    if (!navigator.onLine) return;
-    var s = document.createElement("script");
-    s.src = "https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js";
-    s.crossOrigin = "anonymous";
-    s.async = true;
-    s.onload = function() {
-      try {
-        if (typeof Sentry !== "undefined" && Sentry.init) {
-          console.log("Sentry loaded dynamically");
-        }
-      } catch(e) {}
-    };
-    document.head.appendChild(s);
-  } catch(e) {}
-}, 3000);
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 try { var _fl = document.getElementById("flux-loader"); if (_fl) { _fl.style.transition = "opacity 0.3s"; _fl.style.opacity = "0"; setTimeout(function() { _fl.remove(); }, 300); } } catch(e) {}
 /* One-time cleanup: remove any stuck zoom from old accessibilityZoom feature */
 try { var _r = document.getElementById("root"); if (_r) { _r.style.transform = ""; _r.style.transformOrigin = ""; _r.style.width = ""; _r.style.minHeight = ""; } var _s = localStorage.getItem("flux_save_v3"); if (_s && _s.indexOf("accessibilityZoom") >= 0) { var _d = JSON.parse(_s); delete _d.accessibilityZoom; localStorage.setItem("flux_save_v3", JSON.stringify(_d)); } } catch(e) {}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js').then(function(r) { console.log('SW registered'); }).catch(function(e) { console.warn('SW failed:', e); }); }
 </script>
 
 

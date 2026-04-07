@@ -1,9 +1,9 @@
 [
   {
-    "id": 19,
+    "id": 22,
     "type": "update",
-    "icon": "🔥",
-    "title": "v5.1.6 — Combo & Income",
-    "message": "Big progression update!\n\n🔥 Combo Streaks — play different games in one session for bonus multiplier (up to ×1.9)\n🏦 Bank Interest — earn passive income based on your tier\n🏆 Weekly Missions — 3 new challenges every week\n📊 Enhanced Stats — per-game win rate bars\n🛡️ Soft-lock protection — emergency close button after 20s\n🐛 Fixed: scroll lock, Stock Trader sell bug, stats tracking, loss toast\n✨ Smoother animations throughout"
+    "icon": "🛠️",
+    "title": "v5.1.9 — Dev Hint",
+    "message": "Tiny QoL update!\n\n🔍 Version number now shows a hint after the 3rd tap so you know how close you are to opening the dev console (5 taps total). First two taps stay silent so accidental discovery is still hard."
   }
 ]
