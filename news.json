@@ -1,9 +1,9 @@
 [
   {
-    "id": 22,
+    "id": 25,
     "type": "update",
-    "icon": "🛠️",
-    "title": "v5.1.9 — Dev Hint",
-    "message": "Tiny QoL update!\n\n🔍 Version number now shows a hint after the 3rd tap so you know how close you are to opening the dev console (5 taps total). First two taps stay silent so accidental discovery is still hard."
+    "icon": "🔧",
+    "title": "v5.1.12 — Layout & Settings Fixes",
+    "message": "Small but important fixes!\n\n🛒 Profile pill no longer overlaps the shop button — it now sits on its own row above the bottom buttons\n👆 'Tap Outside to Close' setting now actually works on every popup (was previously only working on a few)\n🧹 Behind-the-scenes cleanup of leftover code from v5.1.11"
   }
 ]
