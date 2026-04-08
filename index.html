@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.12";
+const VERSION = "v5.1.13";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -14647,7 +14647,7 @@ function FluxApp() {
   var save = loadSave();
   const [chips, setChips] = useState(save.chips);
   const [game, setGame] = useState(null);
-  const [splash, setSplash] = useState("show");
+  const [splash, setSplash] = useState("done");
   const [hubPhase, setHubPhase] = useState("hidden");
   const [safeMode, setSafeMode] = useState(save.safeMode || false);
   const [debtPopup, setDebtPopup] = useState(null);
@@ -15662,13 +15662,9 @@ function FluxApp() {
     } catch (e) {}
   }
   useEffect(function () {
-    var minShown = false;
+    var minShown = true; /* splash skipped in v5.1.13 — no minimum wait */
     var loaded = false;
     var done = false;
-    var minTimer = setTimeout(function () {
-      minShown = true;
-      tryTransition();
-    }, 600);
     function checkLoaded() {
       if (document.fonts && document.fonts.ready) {
         var fontTimeout = setTimeout(function () { loaded = true; tryTransition(); }, 3000);
@@ -15715,7 +15711,6 @@ function FluxApp() {
       }, 1200);
     }
     return function () {
-      clearTimeout(minTimer);
       window.removeEventListener("load", checkLoaded);
     };
   }, []);
