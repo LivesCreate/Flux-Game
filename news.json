@@ -1,9 +1,9 @@
 [
   {
-    "id": 27,
+    "id": 29,
     "type": "update",
-    "icon": "🧹",
-    "title": "v5.1.15 — Tidy Up",
-    "message": "Reverted the version label next to the Settings title — cleaner look."
+    "icon": "📝",
+    "title": "v5.1.17 — Known Issues Refresh",
+    "message": "Pruned the Known Issues list in About to reflect what's actually been fixed. The ghost-box layout bug (Look & Sound / Customize on wide screens) and the player name button overlap on Android are both gone — those entries are removed."
   }
 ]
