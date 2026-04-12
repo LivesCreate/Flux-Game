@@ -1,9 +1,9 @@
 [
   {
-    "id": 25,
+    "id": 26,
     "type": "update",
-    "icon": "⚡",
-    "title": "v5.1.13 — Faster Launch & Fixes",
-    "message": "Quicker and cleaner!\n\n⚡ App now launches straight into the hub — no more FluxBucks splash screen on open\n🛒 Profile pill no longer overlaps the shop button — it now sits on its own row above the bottom buttons\n👆 'Tap Outside to Close' setting now actually works on every popup (was previously only working on a few)\n🧹 Behind-the-scenes cleanup"
+    "icon": "🏷️",
+    "title": "v5.1.14 — Version in Settings",
+    "message": "Small addition!\n\n🏷️ Version number now shows next to the Settings title — no more guessing which build you're on"
   }
 ]

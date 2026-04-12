@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.13";
+const VERSION = "v5.1.14";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -16532,7 +16532,9 @@ function FluxApp() {
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, "⚙️ Settings"), /*#__PURE__*/React.createElement("button", {
+  }, "⚙️ Settings"), /*#__PURE__*/React.createElement("span", {
+    style: { marginLeft: 10, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: "var(--dim)", letterSpacing: 0.5, opacity: 0.7 }
+  }, VERSION), /*#__PURE__*/React.createElement("button", {
     onClick: closeSettings,
     style: {
       width: 32,
