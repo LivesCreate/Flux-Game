@@ -1,9 +1,9 @@
 [
   {
-    "id": 29,
+    "id": 30,
     "type": "update",
-    "icon": "📝",
-    "title": "v5.1.17 — Known Issues Refresh",
-    "message": "Pruned the Known Issues list in About to reflect what's actually been fixed. The ghost-box layout bug (Look & Sound / Customize on wide screens) and the player name button overlap on Android are both gone — those entries are removed."
+    "icon": "🛠️",
+    "title": "v5.1.18 — Game Fixes & Countdown",
+    "message": "Baccarat now shows cards on the very first deal instead of staying blank. Bomb Defuser hint cost now scales smoothly with your bet (10 bet → 5 chips, 250 bet → 125 chips) and the button shows the price. Skip All on achievement toasts now animates every pending toast out together. New release-countdown banner: if release.json is present in the repo, a live timer shows at the top until release, then a save-and-refresh popup fires at zero."
   }
 ]

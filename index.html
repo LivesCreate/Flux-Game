@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.17";
+const VERSION = "v5.1.18";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -2039,10 +2039,15 @@ function AchievementToastStack({
   var baseStyle = {};
   if (isBottom) baseStyle.bottom = 76;else baseStyle.top = 24;
   if (isRight) baseStyle.right = 14;else baseStyle.left = 14;
+  var [dismissingAll, setDismissingAll] = useState(false);
   function dismissAll() {
-    toasts.forEach(function (t) {
-      onDismiss(t.queueId);
-    });
+    // Signal every toast to animate out simultaneously, then remove them
+    // all from parent state once the exit animation has time to complete.
+    setDismissingAll(true);
+    var ids = toasts.map(function (t) { return t.queueId; });
+    setTimeout(function () {
+      ids.forEach(function (id) { onDismiss(id); });
+    }, 300);
   }
   return /*#__PURE__*/React.createElement("div", {
     style: Object.assign({}, baseStyle, {
@@ -2079,7 +2084,8 @@ function AchievementToastStack({
       },
       pos: pos,
       index: i,
-      total: toasts.length
+      total: toasts.length,
+      forceExit: dismissingAll
     });
   }));
 }
@@ -2088,7 +2094,8 @@ function AchievementToastItem({
   onDone,
   pos,
   index,
-  total
+  total,
+  forceExit
 }) {
   var [phase, setPhase] = useState("enter");
   var def = ACHIEVEMENTS.find(function (a) {
@@ -2110,6 +2117,9 @@ function AchievementToastItem({
       clearTimeout(t2);
     };
   }, []);
+  useEffect(function () {
+    if (forceExit) setPhase("exit");
+  }, [forceExit]);
   if (!def) return null;
   var p = pos || "bottom-right";
   var isRight = p === "bottom-right" || p === "top-right";
@@ -9868,8 +9878,12 @@ function Baccarat({
         bVal = 5;
       }
     }
-    setPCards(pc);
-    setBCards(bc);
+    // Commit cards in their own animation frame so the first render paints them
+    // before the 1s result delay begins (fixes first-play invisible cards).
+    requestAnimationFrame(function () {
+      setPCards(pc);
+      setBCards(bc);
+    });
     setTimeout(function () {
       var winner = pVal > bVal ? "player" : bVal > pVal ? "banker" : "tie";
       var won = betSide === winner;
@@ -11460,7 +11474,7 @@ function BombDefuser({
   }, []);
   function useHint() {
     if (hintUsed) return;
-    var hintCost = bet <= 10 ? 5 : bet <= 25 ? 15 : bet <= 50 ? 30 : bet <= 100 ? 60 : 120;
+    var hintCost = Math.max(5, Math.ceil(bet * 0.5));
     if (chips < hintCost) { setHint("Not enough chips for hint (" + hintCost + " needed)"); return; }
     setChips(function(c) { return c - hintCost; });
     setHintUsed(true);
@@ -11680,7 +11694,7 @@ function BombDefuser({
   }, !hintUsed && /*#__PURE__*/React.createElement(Btn, {
     onClick: useHint,
     color: "#eab308"
-  }, "\uD83D\uDCA1 Use Hint"), safeWires.length > 0 && safeWires.length < WIRE_COUNT - BOMB_COUNT && /*#__PURE__*/React.createElement(Btn, {
+  }, "\uD83D\uDCA1 Use Hint (-" + Math.max(5, Math.ceil(bet * 0.5)) + ")"), safeWires.length > 0 && safeWires.length < WIRE_COUNT - BOMB_COUNT && /*#__PURE__*/React.createElement(Btn, {
     onClick: cashOutBomb,
     color: "var(--neon2)"
   }, "Cash Out")))), phase === "result" && /*#__PURE__*/React.createElement(Panel, {
@@ -12660,6 +12674,10 @@ function UpdateBanner({
   var [newVersion, setNewVersion] = useState(null);
   var [dismissed, setDismissed] = useState(false);
   var [updating, setUpdating] = useState(false);
+  var [release, setRelease] = useState(null); /* {target:Date, title, message} */
+  var [now, setNow] = useState(Date.now());
+  var [releaseHit, setReleaseHit] = useState(false);
+  var [releaseDismissed, setReleaseDismissed] = useState(false);
   function parseVer(v) {
     var m = (v || "").match(/^v?(\d+)\.(\d+)\.(\d+)/);
     if (!m) return null;
@@ -12674,14 +12692,49 @@ function UpdateBanner({
     return r[2] > l[2];
   }
   useEffect(function () {
-    var url = window.location.href.replace(/index\.html.*$/, "").replace(/\/$/, "") + "/version.txt";
-    fetch(url + "?t=" + Date.now()).then(function (r) {
+    var base = window.location.href.replace(/index\.html.*$/, "").replace(/\/$/, "");
+    fetch(base + "/version.txt?t=" + Date.now()).then(function (r) {
       return r.text();
     }).then(function (t) {
       var v = t.trim();
       if (v && v.startsWith("v") && isNewer(v, currentVersion)) setNewVersion(v);
     }).catch(function () {});
+    /* Optional release.json for countdown banner */
+    fetch(base + "/release.json?t=" + Date.now()).then(function (r) {
+      if (!r.ok) throw 0;
+      return r.json();
+    }).then(function (j) {
+      if (j && j.target) {
+        var d = new Date(j.target).getTime();
+        if (!isNaN(d) && d > Date.now()) {
+          setRelease({ target: d, title: j.title || "Update incoming", message: j.message || "A new version is on the way." });
+        }
+      }
+    }).catch(function () {});
   }, []);
+  useEffect(function () {
+    if (!release) return;
+    var iv = setInterval(function () {
+      var n = Date.now();
+      setNow(n);
+      if (n >= release.target && !releaseHit) {
+        setReleaseHit(true);
+        clearInterval(iv);
+      }
+    }, 1000);
+    return function () { clearInterval(iv); };
+  }, [release, releaseHit]);
+  function fmtCountdown(ms) {
+    if (ms <= 0) return "0s";
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60); s -= m * 60;
+    if (d > 0) return d + "d " + h + "h " + m + "m";
+    if (h > 0) return h + "h " + m + "m " + s + "s";
+    if (m > 0) return m + "m " + s + "s";
+    return s + "s";
+  }
   function doUpdate() {
     setUpdating(true);
     /* Clear all SW caches then unregister, then hard reload */
@@ -12706,6 +12759,38 @@ function UpdateBanner({
     } else {
       window.location.href = window.location.href.split("?")[0] + "?update=" + Date.now();
     }
+  }
+  /* Zero-hit popup: prompts save before refresh */
+  if (releaseHit && !releaseDismissed) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { position: "fixed", inset: 0, zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "88%", maxWidth: 340, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
+    }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 40, marginBottom: 10 } }, "\uD83D\uDE80"),
+      /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 8 } }, release && release.title ? release.title : "Update is live"),
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: "var(--dim)", lineHeight: 1.6, marginBottom: 16 } }, "Your progress has been saved locally. Refresh now to get the latest version."),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: doUpdate,
+        style: { padding: "12px 28px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6", marginBottom: 8, width: "100%" }
+      }, "\uD83D\uDD04 Save & Refresh"),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: function () { setReleaseDismissed(true); },
+        style: { padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)" }
+      }, "Later")));
+  }
+  /* Countdown banner (only shows if no newer version already detected) */
+  if (release && !releaseHit && !dismissed && !newVersion) {
+    var remain = release.target - now;
+    return /*#__PURE__*/React.createElement("div", {
+      style: { position: "fixed", top: 0, left: 0, right: 0, zIndex: 500, padding: "8px 16px", background: "linear-gradient(135deg,rgba(86,193,255,0.95),rgba(99,102,241,0.95))", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, animation: "fadeUp 0.3s" }
+    }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#fff", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", null, "\u23F3"),
+      /*#__PURE__*/React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace", fontWeight: 800 } }, fmtCountdown(remain)),
+      /*#__PURE__*/React.createElement("span", { style: { opacity: 0.9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "until " + (release.title || "next release"))),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: function () { setDismissed(true); },
+        style: { padding: "4px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,0.2)", color: "#fff", border: "none", flexShrink: 0 }
+      }, "\u2715"));
   }
   if (!newVersion || dismissed) return null;
   return /*#__PURE__*/React.createElement("div", {
