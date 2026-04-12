@@ -1,9 +1,9 @@
 [
   {
-    "id": 26,
+    "id": 27,
     "type": "update",
-    "icon": "🏷️",
-    "title": "v5.1.14 — Version in Settings",
-    "message": "Small addition!\n\n🏷️ Version number now shows next to the Settings title — no more guessing which build you're on"
+    "icon": "🧹",
+    "title": "v5.1.15 — Tidy Up",
+    "message": "Reverted the version label next to the Settings title — cleaner look."
   }
 ]
