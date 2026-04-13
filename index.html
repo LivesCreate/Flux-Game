@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.18";
+const VERSION = "v5.1.21";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -488,8 +488,10 @@ function fbMergeSaves(local, cloud) {
 /* Public profile for friends */
 function fbSaveProfile(uid, data) {
   if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
+  var uname = data.username || "Player";
   var profile = {
-    username: data.username || "Player",
+    username: uname,
+    usernameLower: uname.toLowerCase(),
     avatar: data.avatar || "👤",
     level: typeof getLevelInfo === "function" ? getLevelInfo(data.xp || 0).level : 1,
     xp: data.xp || 0,
@@ -503,6 +505,80 @@ function fbSaveProfile(uid, data) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   return fbDb.collection("profiles").doc(uid).set(profile, { merge: true }).catch(function (e) { console.warn("Profile save failed:", e); });
+}
+
+/* Username search — prefix match, case-insensitive */
+function fbSearchUsername(query, myUid) {
+  if (!fbAvailable || !fbDb || !query) return Promise.resolve([]);
+  var q = query.trim().toLowerCase();
+  if (q.length < 2) return Promise.resolve([]);
+  return fbDb.collection("profiles")
+    .where("usernameLower", ">=", q)
+    .where("usernameLower", "<=", q + "\uf8ff")
+    .limit(10)
+    .get()
+    .then(function (snap) {
+      var results = [];
+      snap.forEach(function (doc) {
+        if (doc.id !== myUid) {
+          var d = doc.data();
+          results.push({
+            uid: doc.id,
+            username: d.username || "Player",
+            avatar: d.avatar || "👤",
+            level: d.level || 1,
+            chips: d.chips || 0
+          });
+        }
+      });
+      return results;
+    })
+    .catch(function (e) { console.warn("Username search failed:", e); return []; });
+}
+
+/* ═══ SESSION TRACKING ═══
+   Each user has a /sessions/current doc with {deviceId, deviceName, at}.
+   On sign-in we claim it. We also subscribe — if the doc flips to a
+   different deviceId we know someone else signed in. */
+function getDeviceId() {
+  try {
+    var id = localStorage.getItem("flux_device_id");
+    if (!id) {
+      id = "d_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem("flux_device_id", id);
+    }
+    return id;
+  } catch (e) { return "d_unknown_" + Math.random().toString(36).slice(2, 8); }
+}
+function getDeviceName() {
+  var ua = navigator.userAgent || "";
+  if (/Android/i.test(ua)) return "Android device";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS device";
+  if (/Mac/i.test(ua)) return "Mac";
+  if (/Windows/i.test(ua)) return "Windows PC";
+  if (/Linux/i.test(ua)) return "Linux device";
+  return "a device";
+}
+function fbClaimSession(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
+  return fbDb.collection("users").doc(uid).collection("sessions").doc("current").set({
+    deviceId: getDeviceId(),
+    deviceName: getDeviceName(),
+    at: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function (e) { console.warn("Session claim failed:", e); });
+}
+function fbWatchSession(uid, onOther) {
+  if (!fbAvailable || !fbDb || !uid) return function () {};
+  var myId = getDeviceId();
+  try {
+    return fbDb.collection("users").doc(uid).collection("sessions").doc("current").onSnapshot(function (snap) {
+      if (!snap.exists) return;
+      var d = snap.data();
+      if (d && d.deviceId && d.deviceId !== myId) {
+        onOther({ deviceName: d.deviceName || "another device" });
+      }
+    }, function (e) { console.warn("Session watch failed:", e); });
+  } catch (e) { console.warn(e); return function () {}; }
 }
 
 
@@ -851,6 +927,57 @@ function fbGetLeaderboard(gameId) {
       snap.forEach(function(d) { results.push(Object.assign({ uid: d.id }, d.data())); });
       return results;
     }).catch(function(e) { console.warn("Leaderboard load failed:", e); return []; });
+}
+
+/* ═══ LEADERBOARD BOT SEEDING ═══
+   Client-side filler bots so an empty leaderboard feels populated. Bots are
+   deterministic per gameId so the same set appears on every view. They are
+   clearly marked with isBot: true so the UI can render them with a subtle
+   badge; they never write to Firestore. Real player scores always merge in
+   and re-sort by score. */
+var LEADERBOARD_BOT_NAMES = [
+  "ChipMaster", "LuckyStrike", "AceHigh", "RoyalFlush", "StackKing",
+  "VegasKid", "DiceDemon", "HighRoller", "WildCard", "NeonShark",
+  "PixelPirate", "CoinCrusher", "SpinDoctor", "JackpotJane", "MaxBet",
+  "FluxFanatic", "GoldGhost", "SilverStreak", "BetBoss", "CloverCharm"
+];
+var LEADERBOARD_BOT_AVATARS = ["🤖","🎰","🎲","🃏","💎","👾","🐉","🦊","🐺","🦁","🦅","🎯","⚡","🔥","💫"];
+var LEADERBOARD_BOT_TIERS = ["Rookie","Regular","Veteran","Expert","Master","Legend"];
+function _lbBotHash(str, seed) {
+  var h = seed || 0;
+  for (var i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+}
+function getLeaderboardBots(gameId, count) {
+  count = count || 12;
+  var bots = [];
+  for (var i = 0; i < count; i++) {
+    var h = _lbBotHash(gameId + "_" + i, 1337);
+    var name = LEADERBOARD_BOT_NAMES[h % LEADERBOARD_BOT_NAMES.length];
+    var avatar = LEADERBOARD_BOT_AVATARS[(h >> 4) % LEADERBOARD_BOT_AVATARS.length];
+    var tier = LEADERBOARD_BOT_TIERS[(h >> 8) % LEADERBOARD_BOT_TIERS.length];
+    /* Spread scores: top bot ~= 50k, bottom ~= 500 — exponential falloff so
+       ranking ladder feels realistic rather than evenly distributed. */
+    var base = Math.floor(50000 * Math.pow(0.78, i));
+    var jitter = ((h >> 12) % 400) - 200;
+    var score = Math.max(100, base + jitter);
+    bots.push({
+      uid: "bot_" + gameId + "_" + i,
+      username: name,
+      avatar: avatar,
+      tier: tier,
+      score: score,
+      isBot: true
+    });
+  }
+  return bots;
+}
+function mergeLeaderboardWithBots(realScores, bots) {
+  var realUids = {};
+  realScores.forEach(function(s) { realUids[s.uid] = true; });
+  var merged = realScores.concat(bots.filter(function(b) { return !realUids[b.uid]; }));
+  merged.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
+  return merged.slice(0, 100);
 }
 
 /* ═══ GIFTING (Feature 2) ═══════════════════════════════════════ */
@@ -2031,7 +2158,8 @@ function checkAchievements(save, event) {
 function AchievementToastStack({
   toasts,
   onDismiss,
-  pos
+  pos,
+  hideSkipAll
 }) {
   var p = pos || "bottom-right";
   var isBottom = p === "bottom-right" || p === "bottom-left";
@@ -2059,7 +2187,7 @@ function AchievementToastStack({
       pointerEvents: "none",
       maxWidth: "min(340px, 85vw)"
     })
-  }, toasts.length > 1 && /*#__PURE__*/React.createElement("button", {
+  }, toasts.length > 1 && !hideSkipAll && /*#__PURE__*/React.createElement("button", {
     onClick: dismissAll,
     style: {
       pointerEvents: "auto",
@@ -13460,7 +13588,7 @@ function FeedbackPopup({
 }
 
 /* ═══ LEADERBOARD PANEL COMPONENT ═══════════════════════════════ */
-function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, avatar }) {
+function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, avatar, perGameWins }) {
   var [tab, setTab] = useState("global");
   var [selectedGame, setSelectedGame] = useState("blackjack");
   var [scores, setScores] = useState([]);
@@ -13469,9 +13597,27 @@ function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, 
   useEffect(function() {
     setLoading(true);
     fbGetLeaderboard(selectedGame).then(function(data) {
-      setScores(data);
+      /* Merge real scores with deterministic bots so new leaderboards feel alive */
+      var bots = getLeaderboardBots(selectedGame, 12);
+      var merged = mergeLeaderboardWithBots(data, bots);
+      /* If current player has local winnings but isn't in the real snapshot yet,
+         synthesize an entry so they see themselves on the board immediately. */
+      if (fbUser && perGameWins && perGameWins[selectedGame] > 0) {
+        var already = merged.some(function(s) { return s.uid === fbUser.uid; });
+        if (!already) {
+          merged.push({
+            uid: fbUser.uid,
+            username: username || "Player",
+            avatar: avatar || "👤",
+            tier: (typeof getTier === "function" ? getTier(lifetimeXp || 0).name : "Rookie"),
+            score: perGameWins[selectedGame]
+          });
+          merged.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
+        }
+      }
+      setScores(merged);
       if (fbUser) {
-        var idx = data.findIndex(function(s) { return s.uid === fbUser.uid; });
+        var idx = merged.findIndex(function(s) { return s.uid === fbUser.uid; });
         setMyRank(idx >= 0 ? idx + 1 : null);
       }
       setLoading(false);
@@ -13480,13 +13626,29 @@ function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, 
   var displayScores = tab === "friends" ? scores.filter(function(s) {
     return friendsList.some(function(f) { return f.uid === s.uid; }) || (fbUser && s.uid === fbUser.uid);
   }) : scores;
-  if (!fbUser) return /*#__PURE__*/React.createElement("div", {
-    style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" },
-    onClick: function(e) { if (e.target === e.currentTarget && window._allowClickOutsideClose) onClose(); }
-  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "90%", maxWidth: 380, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" } },
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 36, marginBottom: 12 } }, "\uD83D\uDD12"),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: "var(--dim)", marginBottom: 16 } }, "Sign in to view leaderboards"),
-    /*#__PURE__*/React.createElement("button", { onClick: onClose, style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none" } }, "Close")));
+  if (!fbUser) {
+    /* Signed-out: still show the bot-seeded board so the game feels alive */
+    var signedOutBots = getLeaderboardBots(selectedGame, 12);
+    signedOutBots.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
+    return /*#__PURE__*/React.createElement("div", {
+      style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" },
+      onClick: function(e) { if (e.target === e.currentTarget && window._allowClickOutsideClose) onClose(); }
+    }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 20, width: "94%", maxWidth: 420, maxHeight: "90vh", overflow: "auto", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+        /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83C\uDFC6 Leaderboards"),
+        /*#__PURE__*/React.createElement("button", { onClick: onClose, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+      /*#__PURE__*/React.createElement("div", { style: { padding: "10px 12px", background: "rgba(192,132,252,0.08)", borderRadius: 8, border: "1px solid rgba(192,132,252,0.2)", fontSize: 11, color: "var(--dim)", textAlign: "center", marginBottom: 12 } }, "Sign in to compete and save your rank!"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+        signedOutBots.slice(0, 15).map(function(s, i) {
+          return /*#__PURE__*/React.createElement("div", { key: s.uid, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)" } },
+            /*#__PURE__*/React.createElement("div", { style: { width: 24, fontSize: 12, fontWeight: 800, color: i < 3 ? "var(--neon)" : "var(--dim)", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, "#" + (i + 1)),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 18 } }, s.avatar),
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, s.username),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)" } }, s.tier)),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "var(--green)", fontFamily: "'JetBrains Mono',monospace" } }, "+" + s.score));
+        }))));
+  }
   var gameNames = { blackjack: "Blackjack", highlow: "Higher/Lower", slots: "Slots", ladder: "Coin Ladder", mines: "Mines", plinko: "Plinko", crash: "Crash", dice: "Dice", keno: "Keno", tower: "Tower", coinflip: "Coin Flip", roulette: "Roulette", bomb: "Bomb Defuser", stocks: "Stocks" };
   return /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" },
@@ -14877,6 +15039,7 @@ function FluxApp() {
   const [showAFK, setShowAFK] = useState(false);
   const [afkDismissCount, setAfkDismissCount] = useState(0);
   const lastActivityRef = useRef(Date.now());
+  const passiveGraceUntilRef = useRef(0);
   const sessionTimerRef = useRef(null);
   const afkDismissRef = useRef(0);
   const logoTapRef = useRef({
@@ -14888,11 +15051,15 @@ function FluxApp() {
   const [fbSyncing, setFbSyncing] = useState(false);
   const [fbLastSync, setFbLastSync] = useState(null);
   const [fbError, setFbError] = useState(null);
+  const [otherDeviceAlert, setOtherDeviceAlert] = useState(null);
   const [showFriends, setShowFriends] = useState(false);
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [addFriendCode, setAddFriendCode] = useState("");
   const [addFriendMsg, setAddFriendMsg] = useState(null);
+  const [friendSearchQuery, setFriendSearchQuery] = useState("");
+  const [friendSearchResults, setFriendSearchResults] = useState([]);
+  const [friendSearching, setFriendSearching] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [viewingFriend, setViewingFriend] = useState(null);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
@@ -14923,6 +15090,7 @@ function FluxApp() {
     if (!fbAvailable || !fbAuth) return function () {};
     var unsub = fbAuth.onAuthStateChanged(function (user) {
       setFbUser(user || null);
+      if (user) { fbClaimSession(user.uid); }
       if (user && !fbInitialLoad.current) {
         fbInitialLoad.current = true;
         setFbSyncing(true);
@@ -14962,6 +15130,35 @@ function FluxApp() {
     });
     return function () { unsub(); };
   }, [fbReady]);
+
+  /* Watch for other-device sign-ins */
+  useEffect(function () {
+    if (!fbUser) return;
+    var unwatch = fbWatchSession(fbUser.uid, function (info) {
+      setOtherDeviceAlert({ deviceName: info.deviceName, at: Date.now() });
+    });
+    return function () { if (typeof unwatch === "function") unwatch(); };
+  }, [fbUser]);
+
+  /* Fire system notifications when app is backgrounded */
+  useEffect(function () {
+    if (!notifPrefs.enabled) return;
+    if (giftTarget && notifPrefs.gifts !== false) {
+      showLocalNotification("🎁 You got a gift!", "Open FluxBucks to claim it.");
+    }
+  }, [giftTarget]);
+  useEffect(function () {
+    if (!notifPrefs.enabled) return;
+    if (showDailyStreak && notifPrefs.streakReminders !== false) {
+      showLocalNotification("🔥 Daily streak ready!", "Claim today's bonus chips.");
+    }
+  }, [showDailyStreak]);
+  useEffect(function () {
+    if (!notifPrefs.enabled) return;
+    if (challengeTarget && notifPrefs.challenges !== false) {
+      showLocalNotification("⚔️ Challenge received!", "A friend wants to compete.");
+    }
+  }, [challengeTarget]);
 
   /* Cloud sync on save (debounced, network-aware) */
   useEffect(function () {
@@ -15045,6 +15242,34 @@ function FluxApp() {
       if (result.ok) {
         setAddFriendMsg({ type: "ok", text: "Friend added!" });
         setAddFriendCode("");
+        doLoadFriends();
+      } else {
+        setAddFriendMsg({ type: "err", text: result.error });
+      }
+    });
+  }
+  function doSearchFriends() {
+    if (!fbUser || !friendSearchQuery.trim()) return;
+    if (friendSearchQuery.trim().length < 2) {
+      setFriendSearchResults([]);
+      setAddFriendMsg({ type: "err", text: "Type at least 2 characters" });
+      return;
+    }
+    setFriendSearching(true);
+    setAddFriendMsg(null);
+    fbSearchUsername(friendSearchQuery, fbUser.uid).then(function (results) {
+      setFriendSearchResults(results);
+      setFriendSearching(false);
+      if (results.length === 0) setAddFriendMsg({ type: "err", text: "No players found" });
+    });
+  }
+  function doAddBySearchResult(uid) {
+    if (!fbUser) return;
+    setAddFriendMsg(null);
+    fbAddFriend(fbUser.uid, uid).then(function (result) {
+      if (result.ok) {
+        setAddFriendMsg({ type: "ok", text: "Friend added!" });
+        setFriendSearchResults(function (prev) { return prev.filter(function (r) { return r.uid !== uid; }); });
         doLoadFriends();
       } else {
         setAddFriendMsg({ type: "err", text: result.error });
@@ -15698,6 +15923,11 @@ function FluxApp() {
       /* AFK thresholds: first=60s, after 1 dismiss=300s, after 2 dismisses=never */
       var threshold = dismisses === 0 ? 60 : dismisses === 1 ? 300 : Infinity;
       if (idleSec >= threshold && threshold < Infinity) {
+        /* Grace window after passive popup dismiss — don't fire AFK yet */
+        if (Date.now() < passiveGraceUntilRef.current) {
+          lastActivityRef.current = Date.now();
+          return;
+        }
         /* Don't fire AFK if any popup is currently blocking the screen */
         var popupOpen = false;
         try { popupOpen = showDailyStreak || !!showPassivePopup || !!levelUpData || !!debtPopup || !!window._devNewsOpen; } catch(e) {}
@@ -15844,6 +16074,14 @@ function FluxApp() {
   /* Feature 6: Lazy game loading via registry */
   var _anyOverlay = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showShareCard || showWeeklyMissions;
   var _anyOverlayFull = _anyOverlay || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || !!showPassivePopup;
+  /* Blocking popups — the ones that should gate Settings/Leaderboard/Shop buttons
+     and suppress the visual AFK popup. Per user spec: buttons look normal but do
+     nothing while any of these are visible. */
+  var _blockingPopup = showDailyStreak || !!showPassivePopup || !!levelUpData || !!debtPopup || showAFK || afkDarken || !!giftTarget || !!challengeTarget;
+  function tryOpenPanel(opener) {
+    if (_blockingPopup) return; /* no-op while a blocking popup is visible */
+    opener();
+  }
   if (game && _gameRegistry[game]) {
     var _extraProps = null;
     if (game === "packs") _extraProps = { collection: collection, setCollection: setCollection };
@@ -16152,6 +16390,10 @@ function FluxApp() {
         setPassiveIncomeLastCollected(Date.now());
         try { playSound(net > 0 ? "xpGain" : "xpLose"); } catch(e2) {}
       } catch(e3) {}
+      /* Idle re-pause grace window: after dismissing, block AFK from firing
+         for 7s so an accidental tap doesn't instantly start the AFK countdown. */
+      passiveGraceUntilRef.current = Date.now() + 7000;
+      lastActivityRef.current = Date.now();
       setShowPassivePopup(null);
     }
   }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid " + (showPassivePopup.decay > 0 ? "rgba(255,94,120,0.3)" : "rgba(74,222,128,0.3)"), borderRadius: 18, padding: 28, width: "88%", maxWidth: 340, textAlign: "center", animation: "scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1)" } },
@@ -16237,6 +16479,7 @@ function FluxApp() {
     }
   }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
+      if (_blockingPopup) return;
       setEditUsername(username);
       setShowSettings(true);
     },
@@ -16262,7 +16505,7 @@ function FluxApp() {
       transition: "opacity 0.2s"
     }
   }, "\u2699\uFE0F"), splash === "done" && /*#__PURE__*/React.createElement("button", {
-    onClick: function () { setShowLeaderboard(true); },
+    onClick: function () { if (_blockingPopup) return; setShowLeaderboard(true); },
     style: {
       position: "fixed",
       bottom: isWide ? 22 : 18,
@@ -16285,7 +16528,7 @@ function FluxApp() {
       transition: "opacity 0.2s"
     }
   }, "🏆"), splash === "done" && /*#__PURE__*/React.createElement("button", {
-    onClick: function() { setShowShop(true); },
+    onClick: function() { if (_blockingPopup) return; setShowShop(true); },
     style: { position: "fixed", bottom: isWide ? 22 : 18, right: isWide ? 138 : 124, width: isWide ? 50 : 44, height: isWide ? 50 : 44, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isWide ? 22 : 20, color: "var(--dim)", zIndex: 698, backdropFilter: "blur(8px)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: _anyOverlay ? 0 : 0.6, pointerEvents: _anyOverlay ? "none" : "auto", transition: "opacity 0.2s" }
   }, "\uD83D\uDED2"), splash === "done" && !_anyOverlay && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
@@ -17429,7 +17672,7 @@ function FluxApp() {
             if (chips < item.price) return;
             setChips(function(c) { return c - item.price; });
             setOwnedItems(function(o) { return o.concat([item.id]); });
-          }, disabled: chips < item.price, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: chips >= item.price ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: chips >= item.price ? "#fff" : "var(--dim)", border: "none", opacity: chips >= item.price ? 1 : 0.4 } }, item.price + " \uD83E\uDE99"));
+          }, disabled: chips < item.price, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: chips >= item.price ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: chips >= item.price ? "#fff" : "var(--dim)", border: "none", opacity: chips >= item.price ? 1 : 0.4 } }, "Buy"));
       }))
   )),
   showDevConsole && /*#__PURE__*/React.createElement("div", {
@@ -17453,7 +17696,7 @@ function FluxApp() {
   ),
   showLeaderboard && /*#__PURE__*/React.createElement(LeaderboardPanel, {
     onClose: function() { setShowLeaderboard(false); },
-    fbUser: fbUser, friendsList: friendsList, lifetimeXp: lifetimeXp, username: username, avatar: avatar
+    fbUser: fbUser, friendsList: friendsList, lifetimeXp: lifetimeXp, username: username, avatar: avatar, perGameWins: perGameWins
   }),
   /* Gift Modal */
   giftTarget && /*#__PURE__*/React.createElement("div", {
@@ -17636,7 +17879,8 @@ function FluxApp() {
   }), visibleToasts.length > 0 && /*#__PURE__*/React.createElement(AchievementToastStack, {
     toasts: visibleToasts,
     onDismiss: dismissToast,
-    pos: toastPos
+    pos: toastPos,
+    hideSkipAll: showAFK || afkDarken
   }), showShareCard && /*#__PURE__*/React.createElement(ShareCard, {
     username: username,
     avatar: avatar,
@@ -17665,7 +17909,20 @@ function FluxApp() {
     }
   }), /*#__PURE__*/React.createElement(UpdateBanner, {
     currentVersion: VERSION
-  }), lossToast && /*#__PURE__*/React.createElement("div", {
+  }), otherDeviceAlert && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { background: "var(--surface)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 18, padding: 24, width: "88%", maxWidth: 340, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
+  }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 40, marginBottom: 10 } }, "\uD83D\uDD10"),
+    /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 8 } }, "New sign-in detected"),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: "var(--dim)", lineHeight: 1.6, marginBottom: 16 } }, "Your account was just signed in on ", /*#__PURE__*/React.createElement("b", { style: { color: "var(--text)" } }, otherDeviceAlert.deviceName), ". If this wasn't you, sign out and change your password."),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function () { setOtherDeviceAlert(null); },
+      style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", marginRight: 8 }
+    }, "It was me"),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function () { setOtherDeviceAlert(null); if (fbSignOut) fbSignOut(); },
+      style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#ff5e78,#f39c12)", color: "#fff", border: "none" } }, "Sign me out"))), lossToast && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       top: 80,
@@ -17814,6 +18071,25 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("button", { onClick: doAddFriend, style: { padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", whiteSpace: "nowrap" } }, "Add")
       ),
       addFriendMsg && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, fontSize: 11, color: addFriendMsg.type === "ok" ? "var(--green)" : "var(--accent)", padding: "6px 10px", borderRadius: 6, background: addFriendMsg.type === "ok" ? "rgba(74,222,128,0.1)" : "rgba(255,94,120,0.1)" } }, addFriendMsg.text)
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 16 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Search by Username"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+        /*#__PURE__*/React.createElement("input", { value: friendSearchQuery, onChange: function (e) { setFriendSearchQuery(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") doSearchFriends(); }, placeholder: "Start typing a name...", style: { flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 12, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", outline: "none" } }),
+        /*#__PURE__*/React.createElement("button", { onClick: doSearchFriends, disabled: friendSearching, style: { padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "var(--surface2)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap", opacity: friendSearching ? 0.6 : 1 } }, friendSearching ? "⏳" : "🔍 Search")
+      ),
+      friendSearchResults.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 6 } },
+        friendSearchResults.map(function (r) {
+          return /*#__PURE__*/React.createElement("div", { key: r.uid, style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)" } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 20 } }, r.avatar),
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, r.username),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)" } }, "Lv." + r.level)
+            ),
+            /*#__PURE__*/React.createElement("button", { onClick: function () { doAddBySearchResult(r.uid); }, style: { padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none" } }, "+ Add")
+          );
+        })
+      )
     ),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Your Friends (" + friendsList.length + ")"),
     friendsLoading ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, fontSize: 13, color: "var(--dim)" } }, "\u23F3 Loading...") :

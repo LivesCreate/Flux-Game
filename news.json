@@ -1,9 +1,9 @@
 [
   {
-    "id": 30,
+    "id": 33,
     "type": "update",
-    "icon": "🛠️",
-    "title": "v5.1.18 — Game Fixes & Countdown",
-    "message": "Baccarat now shows cards on the very first deal instead of staying blank. Bomb Defuser hint cost now scales smoothly with your bet (10 bet → 5 chips, 250 bet → 125 chips) and the button shows the price. Skip All on achievement toasts now animates every pending toast out together. New release-countdown banner: if release.json is present in the repo, a live timer shows at the top until release, then a save-and-refresh popup fires at zero."
+    "icon": "🏆",
+    "title": "v5.1.21 — Leaderboards Alive",
+    "message": "Leaderboards are no longer empty — each game has 12 seeded players (ChipMaster, HighRoller, JackpotJane and friends) so you can see where you stack up. Your own score merges in and re-sorts automatically. Signed-out players can now browse the leaderboard without signing in. Small shop polish: Card Themes buy button now says 'Buy' like the other sections."
   }
 ]
