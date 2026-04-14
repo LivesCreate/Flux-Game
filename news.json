@@ -1,9 +1,9 @@
 [
   {
-    "id": 34,
+    "id": 35,
     "type": "update",
-    "icon": "🚀",
-    "title": "v5.2.0 — Notifications Actually Work Now",
-    "message": "Notifications were broken — they only fired when the app was backgrounded, so you never saw them. Now they appear as a top-center toast in-app too. The permission prompt asks on first tap so you don't have to dig through settings. New: 5-minute background check warns you when someone passes you on the leaderboard. Service worker cache trimmed — only caches local files now, not all the CDN scripts. APK can't do true OS push (added to Known Issues honestly), but the in-app toast covers the experience while the app is open."
+    "icon": "🔧",
+    "title": "v5.2.1 — AFK + Notification Fixes",
+    "message": "Tap-to-resume on the dimmed AFK screen no longer leaks through to open whatever game was under it. Notifications in the Android status bar now auto-dismiss after 7 seconds and focus the app when you tap them — no more stuck notifications that do nothing."
   }
 ]

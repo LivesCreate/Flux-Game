@@ -1,4 +1,4 @@
-var CACHE_NAME = 'flux-v5-2-0';
+var CACHE_NAME = 'flux-v5-2-1';
 var URLS_TO_CACHE = ['./', './index.html'];
 self.addEventListener('install', function(e) {
   e.waitUntil(

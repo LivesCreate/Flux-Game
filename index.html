@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.2.0";
+const VERSION = "v5.2.1";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -1085,7 +1085,22 @@ function showLocalNotification(title, body) {
     }
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
-    new Notification(title, { body: body, icon: "icon-192.png" });
+    var n = new Notification(title, {
+      body: body,
+      icon: "icon-192.png",
+      tag: "flux-" + (title || "").slice(0, 20), /* replace same-topic instead of stacking */
+      requireInteraction: false,
+      silent: false
+    });
+    /* Tapping the notification focuses the app */
+    n.onclick = function (e) {
+      try { e.preventDefault(); } catch(_) {}
+      try { window.focus(); } catch(_) {}
+      try { if (window.parent) window.parent.focus(); } catch(_) {}
+      try { n.close(); } catch(_) {}
+    };
+    /* Auto-dismiss after 7s so it doesn't stick forever */
+    setTimeout(function () { try { n.close(); } catch(_) {} }, 7000);
   } catch(e) {}
 }
 /* Pro-active permission request — call once on first user gesture so the
@@ -18202,9 +18217,10 @@ function FluxApp() {
   )),
   /* ═══ AFK DARKEN OVERLAY (subtle dim like a phone idle screen) ═══ */
   afkDarken && /*#__PURE__*/React.createElement("div", {
-    onTouchStart: function() { lastActivityRef.current = Date.now(); setAfkDarken(false); setSessionActive(true); },
-    onMouseDown: function() { lastActivityRef.current = Date.now(); setAfkDarken(false); setSessionActive(true); },
-    style: { position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", transition: "opacity 0.4s ease", animation: "fadeUp 0.4s ease" }
+    onTouchStart: function(e) { e.preventDefault(); e.stopPropagation(); lastActivityRef.current = Date.now(); setAfkDarken(false); setSessionActive(true); },
+    onMouseDown: function(e) { e.preventDefault(); e.stopPropagation(); lastActivityRef.current = Date.now(); setAfkDarken(false); setSessionActive(true); },
+    onClick: function(e) { e.preventDefault(); e.stopPropagation(); },
+    style: { position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", transition: "opacity 0.4s ease", animation: "fadeUp 0.4s ease", touchAction: "none", pointerEvents: "auto" }
   }, /*#__PURE__*/React.createElement("div", {
     style: { position: "absolute", bottom: "calc(28% + env(safe-area-inset-bottom, 0px))", left: 0, right: 0, textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1, textTransform: "uppercase", animation: "breathe 3s ease-in-out infinite" }
   }, "Tap to resume")),
