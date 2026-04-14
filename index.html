@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.1.21";
+const VERSION = "v5.2.0";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -1078,10 +1078,25 @@ function saveNotifPrefs(prefs) {
 }
 function showLocalNotification(title, body) {
   try {
+    /* If app is in foreground, fire an in-app toast instead */
+    if (!document.hidden) {
+      if (window._fluxInAppNotify) window._fluxInAppNotify({ title: title, body: body });
+      return;
+    }
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
-    if (!document.hidden) return; /* Only show if app is backgrounded */
     new Notification(title, { body: body, icon: "icon-192.png" });
+  } catch(e) {}
+}
+/* Pro-active permission request — call once on first user gesture so the
+   prompt actually appears for users who never visit Settings → Notifications. */
+function requestNotifPermissionOnce() {
+  try {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    if (window._fluxAskedNotif) return;
+    window._fluxAskedNotif = true;
+    Notification.requestPermission().catch(function(){});
   } catch(e) {}
 }
 
@@ -13913,7 +13928,7 @@ function InfoPanel({
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.6 } }, "Originally created in early 2025 as a simple casino prototype. Development resumed in March 2026 with Claude AI as the primary development partner. The game grew from a single dice game into a collection of 29+ games with cloud saves, friends, leaderboards, and more.")),
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "rgba(255,94,120,0.06)", borderRadius: 10, border: "1px solid rgba(255,94,120,0.15)" } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 } }, "\u26A0\uFE0F Known Issues"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.8 } }, "\u2022 Only tested on Android (Pixel 9). iOS behavior unknown \u2014 no iOS test device available\n\u2022 APK version opens external links in browser instead of in-app\n\u2022 Some emoji may display as ? on older Android WebViews")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.8 } }, "\u2022 Only tested on Android (Pixel 9). iOS behavior unknown \u2014 no iOS test device available\n\u2022 APK version opens external links in browser instead of in-app\n\u2022 APK version cannot send true OS push notifications \u2014 in-app toast fallback used instead. True push requires a native Capacitor plugin\n\u2022 Some emoji may display as ? on older Android WebViews")),
     /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.5, textAlign: "center", marginBottom: 8 } }, "Built solo with \u2764\uFE0F and Claude AI"), GAME_CREDITS.map(function (g) {
     return /*#__PURE__*/React.createElement("div", {
       key: g.name,
@@ -15052,6 +15067,15 @@ function FluxApp() {
   const [fbLastSync, setFbLastSync] = useState(null);
   const [fbError, setFbError] = useState(null);
   const [otherDeviceAlert, setOtherDeviceAlert] = useState(null);
+  const [inAppNotif, setInAppNotif] = useState(null);
+  /* Wire global dispatcher so showLocalNotification can show in-app toasts when foregrounded */
+  useEffect(function () {
+    window._fluxInAppNotify = function (n) {
+      setInAppNotif({ title: n.title, body: n.body, at: Date.now() });
+      setTimeout(function () { setInAppNotif(function (cur) { return cur && cur.at === n.at ? null : cur; }); }, 4500);
+    };
+    return function () { window._fluxInAppNotify = null; };
+  }, []);
   const [showFriends, setShowFriends] = useState(false);
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -15159,6 +15183,39 @@ function FluxApp() {
       showLocalNotification("⚔️ Challenge received!", "A friend wants to compete.");
     }
   }, [challengeTarget]);
+  /* Periodic leaderboard rank watcher — notifies if someone passed you */
+  useEffect(function () {
+    if (!fbUser || !notifPrefs.enabled) return;
+    function checkRanks() {
+      try {
+        var games = Object.keys(perGameWins || {});
+        games.forEach(function (gid) {
+          var myScore = perGameWins[gid] || 0;
+          if (myScore <= 0) return;
+          fbGetLeaderboard(gid).then(function (real) {
+            var bots = (typeof getLeaderboardBots === "function") ? getLeaderboardBots(gid, 12) : [];
+            var merged = mergeLeaderboardWithBots(real, bots);
+            /* Insert player if missing */
+            if (!merged.some(function (s) { return s.uid === fbUser.uid; })) {
+              merged.push({ uid: fbUser.uid, score: myScore });
+              merged.sort(function (a, b) { return (b.score || 0) - (a.score || 0); });
+            }
+            var idx = merged.findIndex(function (s) { return s.uid === fbUser.uid; });
+            var rank = idx >= 0 ? idx + 1 : null;
+            var key = "flux_lastrank_" + gid;
+            var lastRank = parseInt(localStorage.getItem(key) || "0", 10);
+            if (rank && lastRank && rank > lastRank) {
+              var diff = rank - lastRank;
+              showLocalNotification("📉 You dropped on the leaderboard", "Someone passed you in " + gid + " — now rank #" + rank + " (was #" + lastRank + ")");
+            }
+            if (rank) localStorage.setItem(key, String(rank));
+          }).catch(function () {});
+        });
+      } catch (e) {}
+    }
+    var iv = setInterval(checkRanks, 5 * 60 * 1000); /* every 5 min */
+    return function () { clearInterval(iv); };
+  }, [fbUser, notifPrefs.enabled]);
 
   /* Cloud sync on save (debounced, network-aware) */
   useEffect(function () {
@@ -15965,6 +16022,8 @@ function FluxApp() {
       if (!sessionActive && !showAFK) {
         setSessionActive(true);
       }
+      /* First user gesture — ask for notification permission */
+      try { if (notifPrefs && notifPrefs.enabled !== false) requestNotifPermissionOnce(); } catch(e) {}
     }
     window.addEventListener("touchstart", onActivity, {
       passive: true
@@ -17909,7 +17968,11 @@ function FluxApp() {
     }
   }), /*#__PURE__*/React.createElement(UpdateBanner, {
     currentVersion: VERSION
-  }), otherDeviceAlert && /*#__PURE__*/React.createElement("div", {
+  }), inAppNotif && /*#__PURE__*/React.createElement("div", {
+    onClick: function () { setInAppNotif(null); },
+    style: { position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 850, background: "rgba(20,20,30,0.95)", border: "1px solid rgba(192,132,252,0.4)", borderRadius: 14, padding: "12px 16px", maxWidth: 340, width: "88%", backdropFilter: "blur(12px)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", animation: "slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1)", cursor: "pointer" }
+  }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "var(--text)", marginBottom: 2 } }, inAppNotif.title),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)" } }, inAppNotif.body)), otherDeviceAlert && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" }
   }, /*#__PURE__*/React.createElement("div", {
     style: { background: "var(--surface)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 18, padding: 24, width: "88%", maxWidth: 340, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }

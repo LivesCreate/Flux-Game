@@ -1,9 +1,9 @@
 [
   {
-    "id": 33,
+    "id": 34,
     "type": "update",
-    "icon": "🏆",
-    "title": "v5.1.21 — Leaderboards Alive",
-    "message": "Leaderboards are no longer empty — each game has 12 seeded players (ChipMaster, HighRoller, JackpotJane and friends) so you can see where you stack up. Your own score merges in and re-sorts automatically. Signed-out players can now browse the leaderboard without signing in. Small shop polish: Card Themes buy button now says 'Buy' like the other sections."
+    "icon": "🚀",
+    "title": "v5.2.0 — Notifications Actually Work Now",
+    "message": "Notifications were broken — they only fired when the app was backgrounded, so you never saw them. Now they appear as a top-center toast in-app too. The permission prompt asks on first tap so you don't have to dig through settings. New: 5-minute background check warns you when someone passes you on the leaderboard. Service worker cache trimmed — only caches local files now, not all the CDN scripts. APK can't do true OS push (added to Known Issues honestly), but the in-app toast covers the experience while the app is open."
   }
 ]
