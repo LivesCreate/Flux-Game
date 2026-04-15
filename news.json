@@ -1,9 +1,9 @@
 [
   {
-    "id": 35,
+    "id": 36,
     "type": "update",
-    "icon": "🔧",
-    "title": "v5.2.1 — AFK + Notification Fixes",
-    "message": "Tap-to-resume on the dimmed AFK screen no longer leaks through to open whatever game was under it. Notifications in the Android status bar now auto-dismiss after 7 seconds and focus the app when you tap them — no more stuck notifications that do nothing."
+    "icon": "🔔",
+    "title": "v5.2.2 — Real Notifications + Tap Feedback",
+    "message": "APK version now sends real Android notifications via the Capacitor Local Notifications plugin — tap one to open the app. Web version still uses the browser Notification API. Every button in the game now has a visible press animation (scales down and brightens briefly) so you can tell it registered your tap."
   }
 ]
