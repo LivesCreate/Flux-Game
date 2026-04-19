@@ -1,9 +1,9 @@
 [
   {
-    "id": 38,
+    "id": 43,
     "type": "update",
-    "icon": "✨",
-    "title": "v5.2.4 — Labels + Notifications + Accessibility",
-    "message": "Renamed 'News' to 'Update Log', 'Feedback' to 'Send Feedback', 'Sign In' to 'Log In', and 'Customize' to 'Gameplay' (it controls gameplay settings, not cosmetics). Four new notifications: achievement unlocked, new friend added you, friend leveled up, and bank interest earned. New Reduce Motion toggle in Look & Sound kills all animations for an accessibility-friendly experience. Fixed streak notification firing multiple times per day due to a timezone bug."
+    "icon": "🔒",
+    "title": "v5.2.9 — Account Panel Rework",
+    "message": "Account panel is now full-screen for easier use. Profile badge shows your username instead of Gmail. New Display Name section lets you edit your name right in the Account panel with a Save button. Friend code and copy button are combined in one compact row. Referral link fixed — no longer shows localhost on APK or local testing. Cloud save timestamp cleaned up (just hours and minutes, no seconds). Sync Now has a brief delay so it feels deliberate. All login text updated from 'Sign in' to 'Log in'."
   }
 ]
