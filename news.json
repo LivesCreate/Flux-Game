@@ -1,9 +1,9 @@
 [
   {
-    "id": 43,
+    "id": 44,
     "type": "update",
-    "icon": "🔒",
-    "title": "v5.2.9 — Account Panel Rework",
-    "message": "Account panel is now full-screen for easier use. Profile badge shows your username instead of Gmail. New Display Name section lets you edit your name right in the Account panel with a Save button. Friend code and copy button are combined in one compact row. Referral link fixed — no longer shows localhost on APK or local testing. Cloud save timestamp cleaned up (just hours and minutes, no seconds). Sync Now has a brief delay so it feels deliberate. All login text updated from 'Sign in' to 'Log in'."
+    "icon": "🚀",
+    "title": "v5.3.0 — Streak Auto-Claim & Polish",
+    "message": "Daily streak popup removed — bonus chips are now claimed automatically with a toast notification instead of a blocking popup. New 'Hide Tap to Resume' toggle in Gameplay settings (separate from Reduce Motion). Account and profile panels now fill edge-to-edge including the status bar and gesture bar areas. All icon references updated to high-resolution 512px. Full account panel rework from v5.2.9 included."
   }
 ]

@@ -13,7 +13,7 @@
 <meta name="full-screen" content="yes">
 <meta name="browsermode" content="application">
 <meta name="screen-orientation" content="portrait">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.1s ease-out, filter 0.1s ease-out, opacity 0.1s ease-out}button:active:not(:disabled){transform:scale(0.94);filter:brightness(1.15)}button:disabled{cursor:not-allowed}</style>
@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.2.9";
+const VERSION = "v5.3.0";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -256,6 +256,7 @@ var DEFAULT_SAVE = {
   autoLevelDismiss: true,
   reduceMotion: false,
   vibrationOff: false,
+  hideTapToResume: false,
   rouletteGoreSkull: false,
   dailyChallengeCompleted: null,
   achievements: [],
@@ -1149,7 +1150,7 @@ function showLocalNotification(title, body, channelId) {
     if (Notification.permission !== "granted") return;
     var n = new Notification(title, {
       body: body,
-      icon: "icon-192.png",
+      icon: "icon-512.png",
       tag: "flux-" + (channelId || "") + "-" + (title || "").slice(0, 15),
       requireInteraction: false,
       silent: false
@@ -15123,6 +15124,7 @@ function FluxApp() {
   const [autoLevelDismiss, setAutoLevelDismiss] = useState(save.autoLevelDismiss !== false);
   const [reduceMotion, setReduceMotion] = useState(save.reduceMotion || false);
   const [vibrationOff, setVibrationOff] = useState(save.vibrationOff || false);
+  const [hideTapToResume, setHideTapToResume] = useState(save.hideTapToResume || false);
   const [rouletteGoreSkull, setRouletteGoreSkull] = useState(save.rouletteGoreSkull || false);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showBgRequest, setShowBgRequest] = useState(false);
@@ -15506,7 +15508,7 @@ function FluxApp() {
       var saveData = {
         chips: chips, safeMode: safeMode, toastPos: toastPos, username: username,
         quickPlay: quickPlay, theme: theme, soundOn: soundOn, avatar: avatar,
-        bgPreset: bgPreset, autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff,
+        bgPreset: bgPreset, autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff, hideTapToResume: hideTapToResume,
         rouletteGoreSkull: rouletteGoreSkull,
         dailyChallengeCompleted: dailyChallengeCompleted,
         achievements: achievements, betHistory: betHistory,
@@ -15548,7 +15550,7 @@ function FluxApp() {
     var saveData = {
       chips: chips, safeMode: safeMode, toastPos: toastPos, username: username,
       quickPlay: quickPlay, theme: theme, soundOn: soundOn, avatar: avatar,
-      bgPreset: bgPreset, autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff,
+      bgPreset: bgPreset, autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff, hideTapToResume: hideTapToResume,
       rouletteGoreSkull: rouletteGoreSkull,
       dailyChallengeCompleted: dailyChallengeCompleted,
       achievements: achievements, betHistory: betHistory,
@@ -15658,7 +15660,7 @@ function FluxApp() {
       soundOn: soundOn,
       avatar: avatar,
       bgPreset: bgPreset,
-      autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff,
+      autoLevelDismiss: autoLevelDismiss, reduceMotion: reduceMotion, vibrationOff: vibrationOff, hideTapToResume: hideTapToResume,
       rouletteGoreSkull: rouletteGoreSkull,
       dailyChallengeCompleted: dailyChallengeCompleted,
       achievements: achievements,
@@ -16166,8 +16168,13 @@ function FluxApp() {
     setLastPlayDate(today);
     if (newStreak > bestDailyStreak) setBestDailyStreak(newStreak);
     setDailyBonusAmount(bonus);
+    /* Auto-claim: give chips immediately, show toast instead of blocking popup */
     setTimeout(function () {
-      setShowDailyStreak(true);
+      setChips(function (c) { return c + bonus; });
+      try { playSound("streak"); } catch(e) {}
+      if (window._fluxInAppNotify) {
+        window._fluxInAppNotify({ title: "🔥 Day " + newStreak + " streak!", body: "+" + bonus + " chips claimed automatically." });
+      }
     }, 1500);
   }, [splash]);
 
@@ -16910,7 +16917,7 @@ function FluxApp() {
     style: {
       background: "var(--surface)",
       borderRadius: 0,
-      padding: "20px 20px calc(20px + env(safe-area-inset-bottom, 0px))",
+      padding: "calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px))",
       width: "100%",
       maxHeight: "100vh",
       overflow: "auto",
@@ -17838,6 +17845,16 @@ function FluxApp() {
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Haptic feedback on wins, losses, and actions.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setVibrationOff(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: !vibrationOff ? "var(--green)" : "var(--surface)", border: !vibrationOff ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
         /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: !vibrationOff ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* ═══ Hide Tap to Resume ═══ */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCA4"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Hide Tap to Resume")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Hides the text on the idle dim screen.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setHideTapToResume(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: hideTapToResume ? "var(--green)" : "var(--surface)", border: hideTapToResume ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: hideTapToResume ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Data Saver ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18231,7 +18248,7 @@ function FluxApp() {
     style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "stretch", justifyContent: "stretch", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(24px)" },
     onClick: function (e) { if (e.target === e.currentTarget) setShowAccount(false); }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { background: "var(--surface)", borderRadius: 0, padding: "20px 20px calc(20px + env(safe-area-inset-bottom, 0px))", width: "100%", maxHeight: "100vh", overflow: "auto", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
+    style: { background: "var(--surface)", borderRadius: 0, padding: "calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px))", width: "100%", maxHeight: "100vh", overflow: "auto", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
   },
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
       /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83D\uDD12 Account"),
@@ -18430,7 +18447,7 @@ function FluxApp() {
     style: { position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", transition: "opacity 0.4s ease", animation: "fadeUp 0.4s ease", touchAction: "none", pointerEvents: "auto" }
   }, /*#__PURE__*/React.createElement("div", {
     style: { position: "absolute", bottom: "calc(28% + env(safe-area-inset-bottom, 0px))", left: 0, right: 0, textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1, textTransform: "uppercase", animation: "breathe 3s ease-in-out infinite", pointerEvents: "none" }
-  }, reduceMotion ? "" : "Tap to resume"))
+  }, hideTapToResume || reduceMotion ? "" : "Tap to resume"))
   );
 }
 var BG_STYLES = {
