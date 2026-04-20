@@ -10,7 +10,7 @@ A browser-based virtual casino & mini-games app with 29 games, built entirely wi
 
 **Android APK:** Built with Capacitor — sideload the APK for a native app experience. 
 
-Game Download: https://github.com/LivesCreate/FluxBucks-Game/releases/download/APK_Build/app-debug.apk
+ APK Game Download: https://github.com/LivesCreate/FluxBucks-Game/releases/download/APK_Build/app-debug.apk
 
 ## Games (29)
 
