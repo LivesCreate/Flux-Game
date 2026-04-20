@@ -2,8 +2,8 @@
   {
     "id": 45,
     "type": "update",
-    "icon": "🔔",
-    "title": "v5.3.1 — Notification Channels Fix",
-    "message": "Notification channels now show as standalone categories in Android settings instead of being grouped under 'Other'. Channel importance raised to HIGH. About section updated to note that the APK version has enhanced notification support with separate toggleable categories."
+    "icon": "🚀",
+    "title": "v5.3.1 — Matrix Rain, Share Card Fix & More",
+    "message": "Matrix background now has animated falling code rain instead of static grid lines. Share card renders crisp on high-DPI screens with version number repositioned. QR codes auto-link — scanning one opens the app and adds the friend automatically. Weekly mission reset notification added. Notification channels fixed — each category now appears as its own toggle in Android notification settings instead of being grouped under Other. APK info card added to About section."
   }
 ]
