@@ -1,9 +1,9 @@
 [
   {
-    "id": 44,
+    "id": 45,
     "type": "update",
     "icon": "🚀",
-    "title": "v5.3.0 — Streak Auto-Claim & Polish",
-    "message": "Daily streak popup removed — bonus chips are now claimed automatically with a toast notification instead of a blocking popup. New 'Hide Tap to Resume' toggle in Gameplay settings (separate from Reduce Motion). Account and profile panels now fill edge-to-edge including the status bar and gesture bar areas. All icon references updated to high-resolution 512px. Full account panel rework from v5.2.9 included."
+    "title": "v5.3.1 — Matrix Rain, Share Card Fix & QR Auto-Link",
+    "message": "Matrix background now has animated falling code rain instead of static grid lines. Share card renders crisp on high-DPI screens (no more pixelated text) with version number repositioned. QR codes now auto-link — scanning one opens the app and adds the friend automatically. Weekly mission reset notification added."
   }
 ]

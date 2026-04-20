@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.0";
+const VERSION = "v5.3.1";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -1447,7 +1447,7 @@ var BACKGROUNDS = {
   },
   "matrix": {
     name: "Matrix",
-    desc: "Digital grid overlay",
+    desc: "Falling code rain",
     icon: "💻"
   },
   "nebula": {
@@ -3689,6 +3689,87 @@ function Starfield() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+  return /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef,
+    style: {
+      position: "fixed",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      zIndex: 0,
+      pointerEvents: "none"
+    }
+  });
+}
+
+/* ═══════════ MATRIX RAIN BACKGROUND ════════════════════════════ */
+function MatrixRain() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    let W, H, columns, drops;
+    const FONT_SIZE = 14;
+    const CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF";
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      columns = Math.ceil(W / FONT_SIZE);
+      var oldDrops = drops || [];
+      drops = [];
+      for (var i = 0; i < columns; i++) {
+        drops[i] = oldDrops[i] != null ? oldDrops[i] : -(Math.random() * 40 | 0);
+      }
+    }
+    resize();
+    var animId;
+    var last = 0;
+    function draw(ts) {
+      animId = requestAnimationFrame(draw);
+      if (ts - last < 50) return;
+      last = ts;
+      ctx.fillStyle = "rgba(0, 10, 0, 0.12)";
+      ctx.fillRect(0, 0, W, H);
+      for (var i = 0; i < columns; i++) {
+        if (drops[i] < 0) { drops[i]++; continue; }
+        var charIdx = Math.random() * CHARS.length | 0;
+        var ch = CHARS[charIdx];
+        var y = drops[i] * FONT_SIZE;
+        /* Head character is bright */
+        var brightness = 1.0;
+        ctx.fillStyle = "rgba(0, 255, 65, " + brightness + ")";
+        ctx.font = FONT_SIZE + "px 'JetBrains Mono', monospace";
+        ctx.fillText(ch, i * FONT_SIZE, y);
+        /* Trail fade — draw a few trailing chars dimmer */
+        for (var t = 1; t < 4; t++) {
+          var ty = y - t * FONT_SIZE;
+          if (ty < 0) break;
+          var dim = 0.5 - t * 0.12;
+          if (dim <= 0) break;
+          ctx.fillStyle = "rgba(0, 255, 65, " + dim + ")";
+          var tc = CHARS[Math.random() * CHARS.length | 0];
+          ctx.fillText(tc, i * FONT_SIZE, ty);
+        }
+        drops[i]++;
+        if (y > H && Math.random() > 0.975) {
+          drops[i] = -(Math.random() * 20 | 0);
+        }
+      }
+    }
+    animId = requestAnimationFrame(draw);
+    window.addEventListener("resize", resize);
+    return function () {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
     };
   }, []);
   return /*#__PURE__*/React.createElement("canvas", {
@@ -12574,15 +12655,20 @@ function ShareCard({
   useEffect(function () {
     var c = canvasRef.current;
     if (!c) return;
+    var dpr = window.devicePixelRatio || 1;
+    var cw = 420, ch = 310;
+    c.width = cw * dpr;
+    c.height = ch * dpr;
+    c.style.width = cw + "px";
+    c.style.height = ch + "px";
     var ctx = c.getContext("2d");
-    c.width = 420;
-    c.height = 310;
-    var g = ctx.createLinearGradient(0, 0, 420, 310);
+    ctx.scale(dpr, dpr);
+    var g = ctx.createLinearGradient(0, 0, cw, ch);
     g.addColorStop(0, "#0e0e18");
     g.addColorStop(0.5, "#1a0a2e");
     g.addColorStop(1, "#0e0e18");
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 420, 310);
+    ctx.fillRect(0, 0, cw, ch);
     /* decorative lines */
     ctx.strokeStyle = "#c084fc33";
     ctx.lineWidth = 1;
@@ -12600,7 +12686,9 @@ function ShareCard({
     ctx.fillText("✦ FluxBucks", 20, 40);
     ctx.fillStyle = "#888";
     ctx.font = "11px monospace";
-    ctx.fillText(VERSION, 180, 40);
+    ctx.textAlign = "right";
+    ctx.fillText(VERSION, 400, 40);
+    ctx.textAlign = "left";
     /* user info */
     ctx.fillStyle = "#fff";
     ctx.font = "bold 18px sans-serif";
@@ -16215,6 +16303,8 @@ function FluxApp() {
         setWeeklyMissionProgress([0, 0, 0]);
         setWeeklyGamesPlayed([]);
         try { localStorage.setItem("flux_weekly_week", ws); } catch(e) {}
+        /* Notify user about new weekly missions */
+        try { showLocalNotification("🎯 New Weekly Missions!", "3 new missions are ready. Complete them for chip rewards!", "flux_streaks"); } catch(e) {}
       }
     }
   }, [splash]);
@@ -16393,6 +16483,28 @@ function FluxApp() {
               if (ok) { setChips(function(c) { return c + 500; }); localStorage.setItem(refKey, "1"); }
             });
           }
+        }
+      } catch(e) {}
+      /* Check friend code in URL (QR code auto-link) */
+      try {
+        var urlParams2 = new URLSearchParams(window.location.search);
+        var friendCode = urlParams2.get("friend");
+        if (friendCode && fbUser && friendCode !== fbUser.uid) {
+          setTimeout(function() {
+            setAddFriendCode(friendCode);
+            setShowFriends(true);
+            fbAddFriend(fbUser.uid, friendCode).then(function(result) {
+              if (result.ok) {
+                setAddFriendMsg({ type: "ok", text: "Friend added!" });
+                setAddFriendCode("");
+                doLoadFriends();
+              } else {
+                setAddFriendMsg({ type: "err", text: result.error });
+              }
+            });
+            /* Clean URL */
+            try { window.history.replaceState({}, "", window.location.pathname); } catch(e2) {}
+          }, 800);
         }
       } catch(e) {}
       setHubPhase("logo");
@@ -18317,7 +18429,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } },
           /*#__PURE__*/React.createElement("div", { style: { flex: 1, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "var(--neon)", background: "var(--bg)", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, fbUser.uid),
           /*#__PURE__*/React.createElement("button", { onClick: function () { try { navigator.clipboard.writeText(fbUser.uid); } catch(e) {} }, style: { padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "\uD83D\uDCCB Copy")),
-        /*#__PURE__*/React.createElement("img", { src: "https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=0d0d1a&color=c084fc&data=" + encodeURIComponent(fbUser.uid), style: { width: 80, height: 80, borderRadius: 8, margin: "8px auto 0", display: "block", imageRendering: "pixelated" } })
+        /*#__PURE__*/React.createElement("img", { src: "https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=0d0d1a&color=c084fc&data=" + encodeURIComponent("https://livescreate.github.io/FluxBucks-Game/?friend=" + fbUser.uid), style: { width: 80, height: 80, borderRadius: 8, margin: "8px auto 0", display: "block", imageRendering: "pixelated" } })
       ),
       /* Referral */
       /*#__PURE__*/React.createElement("div", { style: { padding: 12, background: "rgba(74,222,128,0.06)", borderRadius: 12, border: "1px solid rgba(74,222,128,0.2)", marginBottom: 12 } },
@@ -18473,8 +18585,8 @@ var BG_STYLES = {
   },
   "matrix": {
     bg: "#000a00",
-    overlay: ["repeating-linear-gradient(90deg, rgba(0,255,65,0.03) 0px, transparent 1px, transparent 40px)", "repeating-linear-gradient(180deg, rgba(0,255,65,0.02) 0px, transparent 1px, transparent 30px)", "radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,255,65,0.05) 0%, transparent 70%)", "linear-gradient(180deg, rgba(0,30,0,0.5) 0%, rgba(0,60,10,0.08) 50%, rgba(0,20,0,0.5) 100%)"].join(","),
-    starOpacity: 0.15
+    overlay: ["radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,255,65,0.04) 0%, transparent 70%)", "linear-gradient(180deg, rgba(0,30,0,0.3) 0%, transparent 40%, rgba(0,20,0,0.3) 100%)"].join(","),
+    starOpacity: 0
   },
   "nebula": {
     bg: "#08030f",
@@ -18523,7 +18635,7 @@ function Wrap({
       opacity: bs.starOpacity,
       transition: "opacity 0.5s"
     }
-  }, /*#__PURE__*/React.createElement(Starfield, null)), !ds && bs.overlay && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Starfield, null)), !ds && bgP === "matrix" && /*#__PURE__*/React.createElement(MatrixRain, null), !ds && bs.overlay && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
