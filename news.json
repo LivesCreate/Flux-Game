@@ -1,9 +1,9 @@
 [
   {
-    "id": 45,
+    "id": 46,
     "type": "update",
     "icon": "🚀",
-    "title": "v5.3.1 — Matrix Rain, Share Card Fix & More",
-    "message": "Matrix background now has animated falling code rain instead of static grid lines. Share card renders crisp on high-DPI screens with version number repositioned. QR codes auto-link — scanning one opens the app and adds the friend automatically. Weekly mission reset notification added. Notification channels fixed — each category now appears as its own toggle in Android notification settings instead of being grouped under Other. APK info card added to About section."
+    "title": "v5.3.2 — Account Linking, Button Animations & Fixes",
+    "message": "New Linked Accounts section in Account panel — link your Email and Google accounts so you can sign in with either one. iOS-style button press animations with highlight flash on tap. Daily streak toast removed for a cleaner experience. Notification channels now show as standalone toggles in Android settings instead of being grouped under Other. Google sign-in confirm dialog removed. APK info card added to About section."
   }
 ]

@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.1s ease-out, filter 0.1s ease-out, opacity 0.1s ease-out}button:active:not(:disabled){transform:scale(0.94);filter:brightness(1.15)}button:disabled{cursor:not-allowed}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.15s ease-out, opacity 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;position:relative}button:active:not(:disabled){transform:scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}button:disabled{cursor:not-allowed}</style>
 <script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.1";
+const VERSION = "v5.3.2";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -220,9 +220,9 @@ html,body,:root{scrollbar-width:none !important;-ms-overflow-style:none !importa
 @keyframes glowPulse{0%,100%{box-shadow:0 0 8px var(--glow-color,transparent)}50%{box-shadow:0 0 20px var(--glow-color,transparent)}}
 @keyframes goldParticle{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0.3)}}
 @keyframes goldGlow{0%{opacity:0;transform:scale(0.5)}30%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(2)}}
-button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1)}
-button:hover:not(:disabled){transform:translateY(-2px) scale(1.03);filter:brightness(1.12)}
-button:active:not(:disabled){transform:translateY(1px) scale(0.97)}
+button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)}
+button:hover:not(:disabled){transform:translateY(-1px) scale(1.02);filter:brightness(1.08)}
+button:active:not(:disabled){transform:translateY(0px) scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}
 button:disabled{cursor:not-allowed;opacity:0.35}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 @keyframes slideUp{from{opacity:0;transform:translateY(24px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -393,7 +393,6 @@ loadFirebaseScripts();
 function fbSignInGoogle() {
   if (!fbAvailable) return Promise.reject(new Error("Firebase not available"));
   var provider = new firebase.auth.GoogleAuthProvider();
-  if (!confirm("This will open Google sign-in in your browser. Continue?")) return Promise.resolve();
   return fbAuth.signInWithRedirect(provider);
 }
 
@@ -408,6 +407,34 @@ function fbSignUpEmail(email, password) {
 function fbSignInAnon() {
   if (!fbAvailable || !fbAuth) return Promise.reject(new Error("Firebase not available"));
   return fbAuth.signInAnonymously();
+}
+
+function fbSignInGithub() {
+  if (!fbAvailable) return Promise.reject(new Error("Firebase not available"));
+  var provider = new firebase.auth.GithubAuthProvider();
+  return fbAuth.signInWithRedirect(provider);
+}
+
+function fbLinkGoogle() {
+  if (!fbAvailable || !fbAuth || !fbAuth.currentUser) return Promise.reject(new Error("Not signed in"));
+  var provider = new firebase.auth.GoogleAuthProvider();
+  return fbAuth.currentUser.linkWithRedirect(provider);
+}
+
+function fbLinkGithub() {
+  if (!fbAvailable || !fbAuth || !fbAuth.currentUser) return Promise.reject(new Error("Not signed in"));
+  var provider = new firebase.auth.GithubAuthProvider();
+  return fbAuth.currentUser.linkWithRedirect(provider);
+}
+
+function fbUnlinkProvider(providerId) {
+  if (!fbAvailable || !fbAuth || !fbAuth.currentUser) return Promise.reject(new Error("Not signed in"));
+  return fbAuth.currentUser.unlink(providerId);
+}
+
+function fbGetLinkedProviders() {
+  if (!fbAuth || !fbAuth.currentUser) return [];
+  return (fbAuth.currentUser.providerData || []).map(function(p) { return p.providerId; });
 }
 
 function fbRequestAccountDeletion(uid) {
@@ -16268,13 +16295,10 @@ function FluxApp() {
     setLastPlayDate(today);
     if (newStreak > bestDailyStreak) setBestDailyStreak(newStreak);
     setDailyBonusAmount(bonus);
-    /* Auto-claim: give chips immediately, show toast instead of blocking popup */
+    /* Auto-claim: give chips immediately, no popup */
     setTimeout(function () {
       setChips(function (c) { return c + bonus; });
       try { playSound("streak"); } catch(e) {}
-      if (window._fluxInAppNotify) {
-        window._fluxInAppNotify({ title: "🔥 Day " + newStreak + " streak!", body: "+" + bonus + " chips claimed automatically." });
-      }
     }, 1500);
   }, [splash]);
 
@@ -18463,6 +18487,36 @@ function FluxApp() {
           setFbSyncing(true);
           setTimeout(function () { doFbForceSync(); }, 1500);
         }, disabled: fbSyncing, style: { padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", opacity: fbSyncing ? 0.5 : 1 } }, "\uD83D\uDD04 Sync")
+      ),
+      /* Linked Accounts */
+      /*#__PURE__*/React.createElement("div", { style: { padding: 12, background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Linked Accounts"),
+        (function() {
+          var providers = fbGetLinkedProviders();
+          var hasGoogle = providers.indexOf("google.com") >= 0;
+          var hasEmail = providers.indexOf("password") >= 0;
+          var isAnon = fbUser.isAnonymous;
+          var totalLinked = (hasGoogle ? 1 : 0) + (hasEmail ? 1 : 0);
+          return /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: hasGoogle ? "var(--text)" : "var(--dim)" } }, "\uD83C\uDF10 Google"),
+              hasGoogle ?
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--green)", fontWeight: 700 } }, "\u2705 Linked") :
+                /*#__PURE__*/React.createElement("button", { onClick: function() { fbLinkGoogle().catch(function(e) {
+                  if (e.code === "auth/credential-already-in-use") setFbError("That Google account is already linked to another FluxBucks account.");
+                  else setFbError(e.message);
+                }); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "linear-gradient(135deg,#4285f4,#34a853)", color: "#fff", border: "none" } }, "Link")
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: hasEmail ? "var(--text)" : "var(--dim)" } }, "\u2709\uFE0F Email"),
+              hasEmail ?
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--green)", fontWeight: 700 } }, "\u2705 Linked") :
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--dim)" } }, "\u2014")
+            ),
+            isAnon && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--accent)", marginTop: 6, lineHeight: 1.4 } }, "Guest accounts can't link providers. Sign in with Google or Email to enable linking."),
+            !isAnon && totalLinked >= 2 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--green)", marginTop: 6 } }, "You can sign in with any linked account. Your data stays the same.")
+          );
+        })()
       ),
       /*#__PURE__*/React.createElement("button", { onClick: doFbSignOut, style: { padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "rgba(255,94,120,0.1)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.3)", width: "100%", textAlign: "center" } }, "\uD83D\uDEAA Sign Out"),
       pendingDeletion ? /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 10, background: "rgba(255,94,120,0.08)", border: "1px solid rgba(255,94,120,0.2)", textAlign: "center" } },
