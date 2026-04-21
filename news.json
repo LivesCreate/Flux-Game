@@ -1,9 +1,9 @@
 [
   {
-    "id": 46,
+    "id": 47,
     "type": "update",
     "icon": "🚀",
-    "title": "v5.3.2 — Account Linking, Button Animations & Fixes",
-    "message": "New Linked Accounts section in Account panel — link your Email and Google accounts so you can sign in with either one. iOS-style button press animations with highlight flash on tap. Daily streak toast removed for a cleaner experience. Notification channels now show as standalone toggles in Android settings instead of being grouped under Other. Google sign-in confirm dialog removed. APK info card added to About section."
+    "title": "v5.3.3 — Notification Channels Fix",
+    "message": "All 8 notification categories (Streaks, Bank, Gifts, Challenges, Achievements, Friends, Leaderboard, Security) now appear on the main Notifications page in Android settings — no more digging through 'Other' or 'Unused categories'. Channels are primed on first launch so Android registers them immediately."
   }
 ]

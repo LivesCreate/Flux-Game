@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.2";
+const VERSION = "v5.3.3";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -1154,6 +1154,26 @@ try {
     ["flux_streaks","flux_bank","flux_gifts","flux_challenges","flux_achievements","flux_friends","flux_leaderboard","flux_security"].forEach(function(old) {
       try { _oldCap.deleteChannel({ id: old }).catch(function(){}); } catch(e) {}
     });
+  }
+} catch(e) {}
+/* Prime channels — Android hides channels under "Other/Unused" until a notification
+   has actually been sent through them. Fire a silent notification per channel on first
+   run, then immediately cancel it. This promotes every channel to the main list. */
+try {
+  var _primedKey = "flux_channels_primed_v2";
+  if (!localStorage.getItem(_primedKey)) {
+    var _primeCap = _fluxCapNotifs();
+    if (_primeCap && _primeCap.schedule && _primeCap.cancel) {
+      var _primeNotifs = NOTIF_CHANNELS.map(function(ch, i) {
+        return { id: 2147000000 + i, title: "", body: "", channelId: ch.id, smallIcon: "ic_stat_icon_config_sample", ongoing: false, autoCancel: true, silent: true };
+      });
+      _primeCap.schedule({ notifications: _primeNotifs }).then(function() {
+        setTimeout(function() {
+          _primeCap.cancel({ notifications: _primeNotifs.map(function(n) { return { id: n.id }; }) }).catch(function(){});
+        }, 500);
+      }).catch(function(){});
+      localStorage.setItem(_primedKey, "1");
+    }
   }
 } catch(e) {}
 
