@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.5";
+const VERSION = "v5.3.6";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -408,6 +408,7 @@ loadFirebaseScripts();
 function fbSignInGoogle() {
   if (!fbAvailable) return Promise.reject(new Error("Firebase not available"));
   var provider = new firebase.auth.GoogleAuthProvider();
+  if (!confirm("This will open Google sign-in in your browser. Continue?")) return Promise.resolve();
   return fbAuth.signInWithRedirect(provider);
 }
 
@@ -982,10 +983,11 @@ function fbGetLeaderboard(gameId) {
    badge; they never write to Firestore. Real player scores always merge in
    and re-sort by score. */
 var LEADERBOARD_BOT_NAMES = [
-  "ChipMaster", "LuckyStrike", "AceHigh", "RoyalFlush", "StackKing",
-  "VegasKid", "DiceDemon", "HighRoller", "WildCard", "NeonShark",
-  "PixelPirate", "CoinCrusher", "SpinDoctor", "JackpotJane", "MaxBet",
-  "FluxFanatic", "GoldGhost", "SilverStreak", "BetBoss", "CloverCharm"
+  "xKai_97", "luna.mp4", "JessT", "dvrk_", "notSam", "bryceW",
+  "kira2k", "zayden", "milo.exe", "itsAva", "tj_onyx", "noahRB",
+  "skyeee", "realMarcus", "ellie.png", "dxniel", "rileyK_",
+  "yungMax", "izzyG", "alx.dev", "lilJade", "mikeyP_", "zoeyXO",
+  "ashR", "cjm_", "tayIor", "lukeHD", "emmaW_", "ryanX", "nina.v"
 ];
 var LEADERBOARD_BOT_AVATARS = ["🤖","🎰","🎲","🃏","💎","👾","🐉","🦊","🐺","🦁","🦅","🎯","⚡","🔥","💫"];
 var LEADERBOARD_BOT_TIERS = ["Rookie","Regular","Veteran","Expert","Master","Legend"];
@@ -13910,14 +13912,14 @@ function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, 
   var [scores, setScores] = useState([]);
   var [loading, setLoading] = useState(false);
   var [myRank, setMyRank] = useState(null);
+  var [page, setPage] = useState(0);
+  var PER_PAGE = 20;
   useEffect(function() {
     setLoading(true);
+    setPage(0);
     fbGetLeaderboard(selectedGame).then(function(data) {
-      /* Merge real scores with deterministic bots so new leaderboards feel alive */
-      var bots = getLeaderboardBots(selectedGame, 12);
+      var bots = getLeaderboardBots(selectedGame, 40);
       var merged = mergeLeaderboardWithBots(data, bots);
-      /* If current player has local winnings but isn't in the real snapshot yet,
-         synthesize an entry so they see themselves on the board immediately. */
       if (fbUser && perGameWins && perGameWins[selectedGame] > 0) {
         var already = merged.some(function(s) { return s.uid === fbUser.uid; });
         if (!already) {
@@ -13990,17 +13992,35 @@ function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, 
     /* Scores list */
     loading ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, color: "var(--dim)" } }, "\u23F3 Loading...") :
     displayScores.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, color: "var(--dim)", fontSize: 12 } }, "No scores yet. Play to get on the board!") :
+    /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-      displayScores.map(function(s, i) {
+      displayScores.slice(page * PER_PAGE, (page + 1) * PER_PAGE).map(function(s, i) {
+        var rank = page * PER_PAGE + i + 1;
         var isMe = fbUser && s.uid === fbUser.uid;
         return /*#__PURE__*/React.createElement("div", { key: s.uid, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: isMe ? "rgba(192,132,252,0.1)" : "var(--surface2)", borderRadius: 8, border: isMe ? "1px solid rgba(192,132,252,0.3)" : "1px solid var(--border)" } },
-          /*#__PURE__*/React.createElement("div", { style: { width: 24, fontSize: 12, fontWeight: 800, color: i < 3 ? "var(--neon)" : "var(--dim)", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, "#" + (i + 1)),
+          /*#__PURE__*/React.createElement("div", { style: { width: 24, fontSize: 12, fontWeight: 800, color: rank <= 3 ? "var(--neon)" : "var(--dim)", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, "#" + rank),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 18 } }, s.avatar || "\uD83D\uDC64"),
           /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
             /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, s.username || "Player"),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)" } }, s.tier || "Bronze")),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "var(--green)", fontFamily: "'JetBrains Mono',monospace" } }, "+" + (s.score || 0)));
       })),
+    /* Pagination */
+    (function() {
+      var totalPages = Math.ceil(displayScores.length / PER_PAGE);
+      if (totalPages <= 1) return null;
+      var visiblePages = [];
+      var start = Math.max(0, page - 2);
+      var end = Math.min(totalPages - 1, page + 2);
+      for (var p = start; p <= end; p++) visiblePages.push(p);
+      return /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: 4, marginTop: 12 } },
+        page > 0 && /*#__PURE__*/React.createElement("button", { onClick: function() { setPage(page - 1); }, style: { width: 28, height: 28, borderRadius: 6, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u25C0"),
+        visiblePages.map(function(p) {
+          return /*#__PURE__*/React.createElement("button", { key: "pg-" + p, onClick: function() { setPage(p); }, style: { width: 28, height: 28, borderRadius: 6, background: p === page ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", border: p === page ? "none" : "1px solid var(--border)", color: p === page ? "#fff" : "var(--dim)", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" } }, p + 1);
+        }),
+        page < totalPages - 1 && /*#__PURE__*/React.createElement("button", { onClick: function() { setPage(page + 1); }, style: { width: 28, height: 28, borderRadius: 6, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u25B6")
+      );
+    })()),
     /* Own rank if not in top 100 */
     myRank === null && fbUser && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, padding: "8px 10px", background: "rgba(192,132,252,0.08)", borderRadius: 8, border: "1px solid rgba(192,132,252,0.2)", fontSize: 11, color: "var(--dim)", textAlign: "center" } }, "Your rank: outside top 100. Keep playing to climb!")
   ));
@@ -14229,7 +14249,7 @@ function InfoPanel({
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.6 } }, "Originally created in late 2025 as a simple casino prototype. Development continued through 2026 with Claude AI as the primary development partner. What started as a single dice game grew into a collection of 29+ games with cloud saves, friends, leaderboards, notifications, and more.")),
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "rgba(255,94,120,0.06)", borderRadius: 10, border: "1px solid rgba(255,94,120,0.15)" } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 } }, "\u26A0\uFE0F Known Issues"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.8 } }, "\u2022 Only tested on Android. iOS behavior is unknown\n\u2022 APK version opens external links in the system browser\n\u2022 Some emoji may render differently across devices")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.8 } }, "\u2022 Only tested on Android. iOS behavior is unknown\n\u2022 APK version opens external links in the system browser\n\u2022 Some emoji may render differently across devices\n\u2022 Google sign-in may fail with a localhost error on APK — this is a Firebase/Google Cloud redirect URI configuration issue")),
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "rgba(86,193,255,0.06)", borderRadius: 10, border: "1px solid rgba(86,193,255,0.15)" } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--cool)", marginBottom: 6 } }, "\uD83D\uDCF1 APK Version"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.6 } }, "The Android APK has enhanced notification support with 8 individual categories you can toggle independently in Phone Settings \u2192 Apps \u2192 FluxBucks \u2192 Notifications. Categories include Streaks, Bank Interest, Gifts, Challenges, Achievements, Friends, Leaderboard, and Security alerts.")),
@@ -16960,8 +16980,12 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 8 } }, "Tip: Check in daily to avoid balance decay!"))),
   /* ═══ FIRST-TIME ONBOARDING ═══ */
   showOnboarding && splash === "done" && /*#__PURE__*/React.createElement("div", {
-    style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508" }
-  }, /*#__PURE__*/React.createElement("div", { style: { width: "92%", maxWidth: 400, textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)" } },
+    style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508", overflow: "hidden", touchAction: "none" },
+    onTouchMove: function(e) { e.preventDefault(); },
+    ref: function(el) { if (el) document.body.style.overflow = "hidden"; }
+  }, /*#__PURE__*/React.createElement("div", { style: { width: "92%", maxWidth: 400, textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)", maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-y" },
+    onTouchMove: function(e) { e.stopPropagation(); }
+  },
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 52, marginBottom: 16, filter: "drop-shadow(0 0 20px rgba(139,92,246,0.5))" } }, "\u2726"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display',serif", fontStyle: "italic", color: "var(--text)", marginBottom: 6 } }, "FluxBucks"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)", marginBottom: 28 } }, "29 games \u00B7 All virtual chips \u00B7 No real money"),
@@ -16991,12 +17015,14 @@ function FluxApp() {
     ),
     /*#__PURE__*/React.createElement("button", { onClick: function() {
       try { localStorage.setItem("flux_onboarded", "1"); } catch(e) {}
+      document.body.style.overflow = "";
       setShowOnboarding(false);
     }, style: { width: "100%", padding: "14px 20px", borderRadius: 12, fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,var(--neon),var(--accent))", color: "#fff", border: "none", marginBottom: 10 } }, "\uD83C\uDFB0 Start Playing"),
     /*#__PURE__*/React.createElement("button", { onClick: function() {
       try { localStorage.setItem("flux_onboarded", "1"); } catch(e) {}
+      document.body.style.overflow = "";
+      setShowAccount(true);
       setShowOnboarding(false);
-      setTimeout(function() { setShowAccount(true); }, 300);
     }, style: { width: "100%", padding: "12px 20px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)" } }, "\uD83D\uDD04 Returning Player? Sign in to restore data")
   )),
   /* ═══ WEEKLY MISSIONS DETAIL POPUP ═══ */
@@ -17176,7 +17202,7 @@ function FluxApp() {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 6
+      marginBottom: 2
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -17186,7 +17212,7 @@ function FluxApp() {
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, avatar + " " + (username || "Player")), /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: getTier(lifetimeXp).color, fontWeight: 700, marginTop: 2 } }, getTier(lifetimeXp).icon + " " + getTier(lifetimeXp).name + " Tier"), /*#__PURE__*/React.createElement("button", {
+  }, avatar + " " + (username || "Player")), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(false);
     },
@@ -17202,7 +17228,9 @@ function FluxApp() {
       alignItems: "center",
       justifyContent: "center"
     }
-  }, "✕")), function () {
+  }, "✕")),
+  /*#__PURE__*/React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: getTier(lifetimeXp).color, fontWeight: 700, background: "rgba(" + (getTier(lifetimeXp).name === "Bronze" ? "205,127,50" : getTier(lifetimeXp).name === "Silver" ? "192,192,192" : getTier(lifetimeXp).name === "Gold" ? "255,215,0" : "139,92,246") + ",0.1)", padding: "3px 10px", borderRadius: 6, marginBottom: 8, border: "1px solid " + getTier(lifetimeXp).color + "33" } }, getTier(lifetimeXp).icon + " " + getTier(lifetimeXp).name + " Tier"),
+  function () {
     var li = getLevelInfo(xp);
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -17321,7 +17349,7 @@ function FluxApp() {
       border: "1px solid var(--border)",
       textAlign: "center"
     }
-  }, "\uD83C\uDFC6 Achieve"), /*#__PURE__*/React.createElement("button", {
+  }, "\uD83C\uDFC6 Achievements"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(false);
       setShowShareCard(true);
@@ -18500,8 +18528,10 @@ function FluxApp() {
       ) :
       /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } }, /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode("main"); setFbError(null); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, color: "var(--accent)", background: "rgba(255,94,120,0.1)", border: "1px solid rgba(255,94,120,0.3)" } }, "\u2190 Back")), authMode === "signup" ? "\u2728 Create New Account" : "\u2709\uFE0F Email Login"),
-        /*#__PURE__*/React.createElement("input", { type: "email", value: authEmail, onChange: function(e) { setAuthEmail(e.target.value); }, placeholder: "Email address", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 8 } }),
-        /*#__PURE__*/React.createElement("input", { type: "password", value: authPass, onChange: function(e) { setAuthPass(e.target.value); }, placeholder: "Password (8+ characters)", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 12 } }),
+        /*#__PURE__*/React.createElement("input", { type: "email", value: authEmail, onChange: function(e) { setAuthEmail(e.target.value); }, placeholder: "Email address", autoComplete: "email", name: "email", inputMode: "email", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 8 } }),
+        /*#__PURE__*/React.createElement("input", { type: "password", value: authPass, onChange: function(e) { setAuthPass(e.target.value); }, placeholder: "Password (8+ characters)", autoComplete: authMode === "signup" ? "new-password" : "current-password", name: "password", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 4 } }),
+        authEmail && authPass.length >= 8 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--cool)", background: "rgba(86,193,255,0.06)", border: "1px solid rgba(86,193,255,0.15)", borderRadius: 8, padding: "6px 10px", marginBottom: 8, lineHeight: 1.4 } }, "\uD83D\uDCE7 " + (authMode === "signup" ? "Creating account" : "Logging in") + " with: ", /*#__PURE__*/React.createElement("strong", null, authEmail)),
+        !authEmail || authPass.length < 8 ? /*#__PURE__*/React.createElement("div", { style: { height: 8 } }) : null,
         /*#__PURE__*/React.createElement("button", { onClick: function() {
           setFbError(null);
           if (authPass.length < 8) { setFbError("Password must be at least 8 characters"); return; }
