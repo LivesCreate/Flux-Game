@@ -1,9 +1,9 @@
 [
   {
-    "id": 47,
+    "id": 49,
     "type": "update",
-    "icon": "🚀",
-    "title": "v5.3.3 — Notification Channels Fix",
-    "message": "All 8 notification categories (Streaks, Bank, Gifts, Challenges, Achievements, Friends, Leaderboard, Security) now appear on the main Notifications page in Android settings — no more digging through 'Other' or 'Unused categories'. Channels are primed on first launch so Android registers them immediately."
+    "icon": "🔧",
+    "title": "v5.3.5 — Toggle & Desktop Fixes",
+    "message": "Fixed toggle switches appearing as stretched squares instead of slim pill shapes. Desktop scaling no longer forces button sizes — icons, toggles, and nav buttons now render at their correct proportions on all screen sizes. Removed CSS conflict that was affecting button positioning."
   }
 ]

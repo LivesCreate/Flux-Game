@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.15s ease-out, opacity 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;position:relative}button:active:not(:disabled){transform:scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}button:disabled{cursor:not-allowed}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.15s ease-out, opacity 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out}button:active:not(:disabled){transform:scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}button:disabled{cursor:not-allowed}</style>
 <script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.3";
+const VERSION = "v5.3.5";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -239,7 +239,22 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 @keyframes smoothSlide{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
 .flux-panel-enter{animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1)}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
+
+/* ═══ DESKTOP / LARGE SCREEN SCALING ═══ */
+@media (min-width: 768px) {
+  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; }
+}
+@media (min-width: 1024px) {
+  #root { max-width: 520px; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+}
+@media (min-width: 1440px) {
+  #root { max-width: 560px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
+}
 `;
+
 
 /* ═══════════ SAVE SYSTEM ════════════════════════════════════════ */
 var SAVE_KEY = "flux_save_v3";
@@ -1527,7 +1542,7 @@ var BACKGROUNDS = {
 var AVATARS = ["👤", "😎", "🎮", "🎰", "💎", "🔥", "⚡", "🌟", "👑", "🐉", "🦊", "🐺", "🎭", "🤖", "👾", "🎯", "💀", "🦅", "🐱", "🎪", "🎲", "🃏", "🧙", "🥷", "🏴‍☠️", "🦁", "🐼", "🦈", "🐸", "🎸", "🏆", "❤️‍🔥", "🌙", "☀️", "🪐", "🧊", "🍀", "🦸", "🧑‍🚀", "🧛", "🤴", "👨‍💻", "🧑‍🎤", "🐲"];
 
 /* ═══ LOADING TIPS ══════════════════════════════════════════════ */
-var LOADING_TIPS = ["Skill games give more XP than luck games", "Play daily to keep your streak alive", "Your streak bonus maxes out at 500 chips on day 6", "Losing streaks in a game increase XP loss — switch games to reset it", "XP can never go below zero", "Tap your profile icon for quick theme/avatar/background changes", "Mines pays more the deeper you go — but one wrong click ends it", "In Blackjack, always stand on 17 or higher", "Crash is about timing — cash out before the line drops", "Higher/Lower streaks can pay huge if you stay patient", "Memory Match rewards speed — faster clears mean bigger payouts", "Use the balance graph to track your chip history over time", "Check your per-game stats to find which games you're best at", "The daily challenge changes every day — bonus chips for winning", "All games use virtual chips only — no real money", "You can change backgrounds in Settings or your profile popup", "Force Main Menu in Settings can fix any stuck screen"];
+var LOADING_TIPS = ["Skill games give more XP than luck games", "Play daily to keep your streak alive", "Your streak bonus maxes out at 500 chips on day 6", "Losing streaks in a game increase XP loss — switch games to reset it", "XP can never go below zero", "Tap your profile icon for quick theme/avatar/background changes", "Mines pays more the deeper you go — but one wrong click ends it", "In Blackjack, always stand on 17 or higher", "Crash is about timing — cash out before the line drops", "Higher/Lower streaks can pay huge if you stay patient", "Memory Match rewards speed — faster clears mean bigger payouts", "Use the balance graph to track your chip history over time", "Check your per-game stats to find which games you're best at", "The daily challenge changes every day — bonus chips for winning", "All games use virtual chips only — no real money", "You can change backgrounds in Settings or your profile popup"];
 var DAILY_CHALLENGES = [/* Win challenges */
 {
   type: "win",
@@ -14026,7 +14041,7 @@ function HelpPage({
     text: "Tap Share in your profile to generate an image card with your stats. Save it to your photos or copy it to share with friends."
   }, {
     title: "🔧 Troubleshooting",
-    text: "Main Menu — Used to return to the main menu if a game gets stuck or you can't exit normally. Refresh — Clears the cache and reloads the app to fix display or loading issues. Reset — Erases all local data and starts fresh (use with caution)."
+    text: "Refresh — Clears the cache and reloads the app to fix display or loading issues. Clear Data — Erases all local data and starts fresh (use with caution)."
   }];
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15299,6 +15314,10 @@ function FluxApp() {
   const [comboMultiplier, setComboMultiplier] = useState(1);
   const [passiveIncomeLastCollected, setPassiveIncomeLastCollected] = useState(save.passiveIncomeLastCollected || null);
   const [showPassivePopup, setShowPassivePopup] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(function() {
+    try { return !localStorage.getItem("flux_onboarded"); } catch(e) { return false; }
+  });
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [weeklyMissions, setWeeklyMissions] = useState([]);
   const [weeklyMissionsCompleted, setWeeklyMissionsCompleted] = useState(save.weeklyMissionsCompleted || null);
   const [weeklyMissionProgress, setWeeklyMissionProgress] = useState(save.weeklyMissionProgress || [0, 0, 0]);
@@ -15358,6 +15377,26 @@ function FluxApp() {
   const [fbSyncing, setFbSyncing] = useState(false);
   const [fbLastSync, setFbLastSync] = useState(null);
   const [fbError, setFbError] = useState(null);
+  function setFbErrorFriendly(msg) {
+    var map = {
+      "auth/invalid-credential": "Email or password is incorrect. Please try again.",
+      "auth/user-not-found": "No account found with that email. Try creating one.",
+      "auth/wrong-password": "Incorrect password. Please try again.",
+      "auth/email-already-in-use": "That email is already registered. Try logging in instead.",
+      "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
+      "auth/network-request-failed": "Network error. Check your internet connection.",
+      "auth/popup-closed-by-user": "Sign-in was cancelled.",
+      "auth/account-exists-with-different-credential": "An account already exists with that email using a different sign-in method.",
+      "auth/invalid-email": "Please enter a valid email address.",
+      "auth/weak-password": "Password is too weak. Use at least 8 characters."
+    };
+    if (msg && typeof msg === "string") {
+      for (var code in map) {
+        if (msg.indexOf(code) >= 0) { setFbError(map[code]); return; }
+      }
+    }
+    setFbError(msg || "Something went wrong. Please try again.");
+  }
   const [otherDeviceAlert, setOtherDeviceAlert] = useState(null);
   const [inAppNotif, setInAppNotif] = useState(null);
   /* Wire global dispatcher so showLocalNotification can show in-app toasts when foregrounded */
@@ -15497,14 +15536,6 @@ function FluxApp() {
     } catch(e) {}
     showLocalNotification("🔥 Daily streak ready!", "Claim today's bonus chips.", "flux2_streaks");
   }, [showDailyStreak]);
-  useEffect(function () {
-    if (!notifPrefs.enabled) return;
-    if (!showPassivePopup) return;
-    var amt = (showPassivePopup.amount || 0) - (showPassivePopup.decay || 0);
-    if (amt > 0) {
-      showLocalNotification("🏦 Bank interest earned", "+" + amt + " chips while you were away. Tap to collect.", "flux2_bank");
-    }
-  }, [showPassivePopup]);
   /* Incoming gift poller */
   useEffect(function () {
     if (!fbUser || !notifPrefs.enabled || notifPrefs.gifts === false) return;
@@ -15680,7 +15711,7 @@ function FluxApp() {
   function doFbSignIn() {
     setFbError(null);
     fbSignInGoogle().catch(function (e) {
-      setFbError(e.message || "Sign-in failed");
+      setFbErrorFriendly(e.message);
     });
   }
   function doFbSignOut() {
@@ -16387,16 +16418,24 @@ function FluxApp() {
       _passiveReady.current = { amount: income, decay: decay, tier: tier.name, hours: Math.floor(hoursAway), mult: (PASSIVE_TIER_BONUS[tier.name] || 1).toFixed(1) };
     }
   }, [splash]);
-  /* Show passive popup AFTER daily streak is dismissed (not on top of it) */
+  /* Auto-claim passive income silently (no popup) */
   useEffect(function () {
     if (splash !== "done") return;
-    if (showDailyStreak) return; /* wait for daily streak to close first */
+    if (showDailyStreak) return;
     if (!_passiveReady.current) return;
     var data = _passiveReady.current;
     _passiveReady.current = false;
-    setTimeout(function() {
-      setShowPassivePopup(data);
-    }, 800);
+    var net = (data.amount || 0) - (data.decay || 0);
+    if (net > 0) {
+      setTimeout(function() {
+        setChips(function(c) { return c + net; });
+        try { playSound("streak"); } catch(e) {}
+        /* Still fire Android notification if app is backgrounded */
+        if (document.hidden) {
+          showLocalNotification("🏦 +" + net + " chips earned", "Bank interest from " + data.hours + "h away (" + data.tier + " tier)", "flux2_bank");
+        }
+      }, 800);
+    }
   }, [splash, showDailyStreak]);
 
 
@@ -16919,6 +16958,47 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", marginBottom: 14 } }, showPassivePopup.tier + " tier \u00B7 " + showPassivePopup.mult + "x multiplier \u00B7 " + showPassivePopup.hours + "h away"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--neon)", fontWeight: 700 } }, "Tap anywhere to collect"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 8 } }, "Tip: Check in daily to avoid balance decay!"))),
+  /* ═══ FIRST-TIME ONBOARDING ═══ */
+  showOnboarding && splash === "done" && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508" }
+  }, /*#__PURE__*/React.createElement("div", { style: { width: "92%", maxWidth: 400, textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)" } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 52, marginBottom: 16, filter: "drop-shadow(0 0 20px rgba(139,92,246,0.5))" } }, "\u2726"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display',serif", fontStyle: "italic", color: "var(--text)", marginBottom: 6 } }, "FluxBucks"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)", marginBottom: 28 } }, "29 games \u00B7 All virtual chips \u00B7 No real money"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16 } }, "Quick Setup"),
+    /*#__PURE__*/React.createElement("div", { style: { textAlign: "left", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginBottom: 16 } },
+      [
+        { label: "Sound Effects", key: "soundOn", desc: "Game sounds and feedback" },
+        { label: "Vibration", key: "vibrationOff", desc: "Haptic feedback on actions", invert: true },
+        { label: "Reduce Motion", key: "reduceMotion", desc: "Simplify animations" },
+        { label: "Auto-dismiss Level Up", key: "autoLevelDismiss", desc: "Level popups close after 2s" }
+      ].map(function(opt, i) {
+        var val = opt.invert ? !save[opt.key] : save[opt.key];
+        return /*#__PURE__*/React.createElement("div", { key: "ob-" + i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--border)" : "none" } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--text)" } }, opt.label),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)" } }, opt.desc)
+          ),
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            var newSave = Object.assign({}, save);
+            newSave[opt.key] = !newSave[opt.key];
+            writeSave(newSave);
+          }, style: { width: 44, height: 26, borderRadius: 13, background: val ? "var(--neon)" : "var(--surface2)", border: "1px solid " + (val ? "rgba(139,92,246,0.5)" : "var(--border)"), position: "relative", transition: "background 0.2s" } },
+            /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: val ? 21 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" } })
+          )
+        );
+      })
+    ),
+    /*#__PURE__*/React.createElement("button", { onClick: function() {
+      try { localStorage.setItem("flux_onboarded", "1"); } catch(e) {}
+      setShowOnboarding(false);
+    }, style: { width: "100%", padding: "14px 20px", borderRadius: 12, fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,var(--neon),var(--accent))", color: "#fff", border: "none", marginBottom: 10 } }, "\uD83C\uDFB0 Start Playing"),
+    /*#__PURE__*/React.createElement("button", { onClick: function() {
+      try { localStorage.setItem("flux_onboarded", "1"); } catch(e) {}
+      setShowOnboarding(false);
+      setTimeout(function() { setShowAccount(true); }, 300);
+    }, style: { width: "100%", padding: "12px 20px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)" } }, "\uD83D\uDD04 Returning Player? Sign in to restore data")
+  )),
   /* ═══ WEEKLY MISSIONS DETAIL POPUP ═══ */
   showWeeklyMissions && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(24px)" },
@@ -17486,25 +17566,6 @@ function FluxApp() {
       textAlign: "center"
     }
   }, "\u21BB Refresh"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setGame(null);
-      setLevelUpData(null);
-      setShowDailyStreak(false);
-      setShowAFK(false);
-      closeSettings();
-    },
-    style: {
-      flex: 1,
-      padding: "8px 6px",
-      borderRadius: 8,
-      fontSize: 10,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--dim)",
-      border: "1px solid var(--border)",
-      textAlign: "center"
-    }
-  }, "\uD83C\uDFE0 Main Menu"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowResetConfirm(true);
     },
@@ -18434,7 +18495,7 @@ function FluxApp() {
         }).catch(function(e) {
           if (e.code === "auth/admin-restricted-operation") {
             setFbError("Guest mode is not available. Please log in with Google or Email.");
-          } else { setFbError(e.message || "Login failed"); }
+          } else { setFbErrorFriendly(e.message); }
         }); }, style: { padding: "9px 20px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)", width: "100%" } }, "Continue as Guest")
       ) :
       /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -18445,8 +18506,8 @@ function FluxApp() {
           setFbError(null);
           if (authPass.length < 8) { setFbError("Password must be at least 8 characters"); return; }
           if (!authEmail.includes("@")) { setFbError("Please enter a valid email address"); return; }
-          if (authMode === "signup") { fbSignUpEmail(authEmail, authPass).catch(function(e) { setFbError(e.message); }); }
-          else { fbSignInEmail(authEmail, authPass).catch(function(e) { setFbError(e.message); }); }
+          if (authMode === "signup") { fbSignUpEmail(authEmail, authPass).catch(function(e) { setFbErrorFriendly(e.message); }); }
+          else { fbSignInEmail(authEmail, authPass).catch(function(e) { setFbErrorFriendly(e.message); }); }
         }, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: authMode === "signup" ? "linear-gradient(135deg,#4ade80,#22c55e)" : "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", width: "100%", marginBottom: 8 } }, authMode === "signup" ? "\u2728 Create Account" : "\uD83D\uDD12 Log In"),
         /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode(authMode === "signup" ? "email" : "signup"); setFbError(null); }, style: { fontSize: 13, color: "var(--neon)", background: "rgba(192,132,252,0.1)", border: "1px solid rgba(192,132,252,0.3)", borderRadius: 8, padding: "6px 12px", fontWeight: 700, width: "100%" } }, authMode === "signup" ? "Have an account? Log in" : "\u2728 Create Account")
       ),
