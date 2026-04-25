@@ -13,10 +13,13 @@
 <meta name="full-screen" content="yes">
 <meta name="browsermode" content="application">
 <meta name="screen-orientation" content="portrait">
-<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 120ms cubic-bezier(.4,0,.2,1), box-shadow 120ms ease, filter 120ms ease;will-change:transform}button:active:not(:disabled){transform:scale(0.96);filter:brightness(0.92);box-shadow:inset 0 2px 4px rgba(0,0,0,0.4)}button:disabled{cursor:not-allowed;opacity:0.35}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch;overscroll-behavior:none;overscroll-behavior-y:none}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 120ms cubic-bezier(.4,0,.2,1), box-shadow 120ms ease, filter 120ms ease;will-change:transform}button:active:not(:disabled){transform:scale(0.96);filter:brightness(0.92);box-shadow:inset 0 2px 4px rgba(0,0,0,0.4)}button:disabled{cursor:not-allowed;opacity:0.35}:root{--sat:env(safe-area-inset-top);--sar:env(safe-area-inset-right);--sab:env(safe-area-inset-bottom);--sal:env(safe-area-inset-left)}</style>
 <script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -40,7 +43,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.8";
+const VERSION = "v5.3.9";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -241,14 +244,12 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
 
 /* ═══ DESKTOP / LARGE SCREEN SCALING ═══ */
-@media (min-width: 768px) {
-  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; }
+/* Only apply max-width when screen is BOTH wide AND landscape (true desktop/laptop) */
+@media (min-width: 900px) and (orientation: landscape) {
+  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
 }
-@media (min-width: 1024px) {
-  #root { max-width: 520px; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
-}
-@media (min-width: 1440px) {
-  #root { max-width: 560px; }
+@media (min-width: 1440px) and (orientation: landscape) {
+  #root { max-width: 540px; }
 }
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
@@ -259,15 +260,42 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 `;
 
 /* ═══ HAPTIC FEEDBACK HELPER ═══ */
+function _hapticIntensityScale() {
+  try {
+    var s = JSON.parse(localStorage.getItem("flux_save_v3"));
+    if (!s) return 1;
+    if (s.hapticIntensity === "light") return 0.5;
+    if (s.hapticIntensity === "strong") return 1.5;
+    return 1;
+  } catch(e) { return 1; }
+}
 function haptic(pattern) {
   try {
     if (typeof pattern === "undefined") pattern = 10;
+    var scale = _hapticIntensityScale();
+    if (typeof pattern === "number") pattern = Math.round(pattern * scale);
+    else if (Array.isArray(pattern)) pattern = pattern.map(function(p) { return Math.round(p * scale); });
     if (navigator.vibrate) navigator.vibrate(pattern);
   } catch(e) {}
 }
 function hapticWin() { haptic([0, 30, 30, 60]); }
 function hapticLight() { haptic(8); }
 function hapticMedium() { haptic(15); }
+function hapticHeavy() { haptic(30); }
+
+/* ═══ NATIVE SHARE HELPER ═══ */
+function nativeShare(title, text, url) {
+  try {
+    if (navigator.share) {
+      return navigator.share({ title: title, text: text, url: url || window.location.href });
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText((title || "") + "\n" + (text || "") + "\n" + (url || window.location.href));
+      return Promise.resolve("clipboard");
+    }
+  } catch(e) {}
+  return Promise.reject(new Error("Share not supported"));
+}
 
 /* Global haptic on button tap — lightweight delegation */
 document.addEventListener("touchstart", function(e) {
@@ -324,6 +352,11 @@ var DEFAULT_SAVE = {
   bestDailyStreak: 0,
   longestSession: 0,
   dataSaver: false,
+  batterySaver: false,
+  masterVolume: 0.8,
+  musicVolume: 0.6,
+  sfxVolume: 1.0,
+  hapticIntensity: "medium",
   passiveIncomeLastCollected: null,
   weeklyMissionsCompleted: null,
   weeklyMissionProgress: [],
@@ -1326,7 +1359,14 @@ function playSound(type) {
     var gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
-    gain.gain.value = 0.08;
+    /* Apply user volume preferences (master × sfx) */
+    var volMult = 1;
+    try {
+      var mv = (typeof window.__fluxMasterVol === "number") ? window.__fluxMasterVol : 0.8;
+      var sv = (typeof window.__fluxSfxVol === "number") ? window.__fluxSfxVol : 1.0;
+      volMult = mv * sv;
+    } catch(e) {}
+    gain.gain.value = 0.08 * volMult;
     if (type === "win") {
       osc.frequency.value = 523;
       osc.type = "sine";
@@ -15483,6 +15523,33 @@ function FluxApp() {
   const [friendSearching, setFriendSearching] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
 
+  /* ═══ PWA INSTALL PROMPT ═══ */
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(function() {
+    try {
+      return window.matchMedia("(display-mode: standalone)").matches ||
+             window.matchMedia("(display-mode: fullscreen)").matches ||
+             window.navigator.standalone === true;
+    } catch(e) { return false; }
+  });
+  useEffect(function() {
+    function onBeforeInstall(e) {
+      e.preventDefault();
+      setPwaInstallPrompt(e);
+    }
+    function onInstalled() {
+      setIsStandalone(true);
+      setPwaInstallPrompt(null);
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return function() {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
   /* ═══ HISTORY API — BACK BUTTON / SWIPE-BACK SUPPORT ═══ */
   const _panelHistoryDepth = useRef(0);
   const _prevPanels = useRef("");
@@ -15532,6 +15599,11 @@ function FluxApp() {
   const [viewingFriend, setViewingFriend] = useState(null);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const [dataSaver, setDataSaver] = useState(save.dataSaver || false);
+  const [batterySaver, setBatterySaver] = useState(save.batterySaver || false);
+  const [masterVolume, setMasterVolume] = useState(typeof save.masterVolume === "number" ? save.masterVolume : 0.8);
+  const [musicVolume, setMusicVolume] = useState(typeof save.musicVolume === "number" ? save.musicVolume : 0.6);
+  const [sfxVolume, setSfxVolume] = useState(typeof save.sfxVolume === "number" ? save.sfxVolume : 1.0);
+  const [hapticIntensity, setHapticIntensity] = useState(save.hapticIntensity || "medium");
   const [netInfo, setNetInfo] = useState({ online: netStatus.online, type: netStatus.type });
   const fbSyncTimer = useRef(null);
   const fbInitialLoad = useRef(false);
@@ -15788,6 +15860,11 @@ function FluxApp() {
         xp: xp, lastPlayDate: lastPlayDate, dailyStreak: dailyStreak,
         bestDailyStreak: bestDailyStreak, longestSession: longestSession,
         dataSaver: dataSaver,
+        batterySaver: batterySaver,
+        masterVolume: masterVolume,
+        musicVolume: musicVolume,
+        sfxVolume: sfxVolume,
+        hapticIntensity: hapticIntensity,
         passiveIncomeLastCollected: passiveIncomeLastCollected,
         weeklyMissionsCompleted: weeklyMissionsCompleted,
         weeklyMissionProgress: weeklyMissionProgress,
@@ -15946,6 +16023,11 @@ function FluxApp() {
       bestDailyStreak: bestDailyStreak,
       longestSession: longestSession,
       dataSaver: dataSaver,
+      batterySaver: batterySaver,
+      masterVolume: masterVolume,
+      musicVolume: musicVolume,
+      sfxVolume: sfxVolume,
+      hapticIntensity: hapticIntensity,
       passiveIncomeLastCollected: passiveIncomeLastCollected,
       weeklyMissionsCompleted: weeklyMissionsCompleted,
       weeklyMissionProgress: weeklyMissionProgress,
@@ -16384,22 +16466,18 @@ function FluxApp() {
   }, [theme]);
   useEffect(function () {
     window.__fluxSoundOff = !soundOn;
-  }, [soundOn]);
+    window.__fluxMasterVol = masterVolume;
+    window.__fluxMusicVol = musicVolume;
+    window.__fluxSfxVol = sfxVolume;
+  }, [soundOn, masterVolume, musicVolume, sfxVolume]);
   useEffect(function () {
     window.__fluxBgPreset = bgPreset;
     window.__fluxDataSaver = dataSaver;
+    window.__fluxBatterySaver = batterySaver;
     var bs = BG_STYLES[bgPreset] || BG_STYLES["stars"];
     document.body.style.background = bs.bg;
-  }, [bgPreset]);
-  /* Browser back button support */
-  useEffect(function () {
-    function handlePop() { setGame(null); setShowSettings(false); setShowProfile(false); setShowStats(false); setShowAchievements(false); setShowInfo(false); setShowHelp(false); setShowChangelog(false); setShowFriends(false); setShowAccount(false); }
-    window.addEventListener("popstate", handlePop);
-    return function () { window.removeEventListener("popstate", handlePop); };
-  }, []);
-  useEffect(function () {
-    if (game) { window.history.pushState({ game: game }, ""); }
-  }, [game]);
+  }, [bgPreset, dataSaver, batterySaver]);
+  /* Browser back button handled by main History API effect above */
   useEffect(function () {
     setBalanceHistory(function (h) {
       var last = h.length > 0 ? h[h.length - 1] : null;
@@ -16526,7 +16604,7 @@ function FluxApp() {
         try { playSound("streak"); } catch(e) {}
         /* Still fire Android notification if app is backgrounded */
         if (document.hidden) {
-          showLocalNotification("🏦 +" + net + " chips earned", "Bank interest from " + data.hours + "h away (" + data.tier + " tier)", "flux2_bank");
+          showLocalNotification("🏦 +" + net + " chips · Bank interest", "Earned while you were away. Tap to play.", "flux2_bank");
         }
       }, 800);
     }
@@ -17052,6 +17130,43 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", marginBottom: 14 } }, showPassivePopup.tier + " tier \u00B7 " + showPassivePopup.mult + "x multiplier \u00B7 " + showPassivePopup.hours + "h away"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--neon)", fontWeight: 700 } }, "Tap anywhere to collect"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 8 } }, "Tip: Check in daily to avoid balance decay!"))),
+  /* ═══ PWA INSTALL MODAL ═══ */
+  showInstallModal && pwaInstallPrompt && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 998, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", padding: 20 },
+    onClick: function(e) { if (e.target === e.currentTarget) setShowInstallModal(false); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "linear-gradient(180deg, #14141A 0%, #1C1C24 100%)", border: "1px solid var(--border)", borderRadius: 20, padding: 24, maxWidth: 380, width: "100%", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)" } },
+    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginBottom: 18 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 56, marginBottom: 10, filter: "drop-shadow(0 0 20px rgba(192,132,252,0.5))" } }, "\u2726"),
+      /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 4 } }, "Install FluxBucks"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)" } }, "Get the full experience")
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { padding: 14, background: "rgba(192,132,252,0.06)", borderRadius: 12, border: "1px solid rgba(192,132,252,0.15)", marginBottom: 14 } },
+      [
+        ["\uD83D\uDE80", "Faster loading", "Works offline once installed"],
+        ["\uD83D\uDD14", "Native notifications", "Get bank interest and gift alerts"],
+        ["\uD83C\uDFAE", "Full-screen play", "No browser bars in your way"],
+        ["\uD83D\uDCF1", "Home screen icon", "Launch like a native app"]
+      ].map(function(b, i) {
+        return /*#__PURE__*/React.createElement("div", { key: "ben-" + i, style: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < 3 ? 10 : 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18 } }, b[0]),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--text)" } }, b[1]),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)" } }, b[2])
+          )
+        );
+      })
+    ),
+    /*#__PURE__*/React.createElement("button", { onClick: function() {
+      if (pwaInstallPrompt) {
+        pwaInstallPrompt.prompt();
+        pwaInstallPrompt.userChoice.then(function() {
+          setPwaInstallPrompt(null);
+          setShowInstallModal(false);
+        });
+      }
+    }, style: { width: "100%", padding: "14px 20px", borderRadius: 12, fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", marginBottom: 8, boxShadow: "0 4px 16px rgba(192,132,252,0.4)" } }, "\uD83D\uDCE5 Install Now"),
+    /*#__PURE__*/React.createElement("button", { onClick: function() { setShowInstallModal(false); }, style: { width: "100%", padding: "10px 20px", borderRadius: 12, fontSize: 12, fontWeight: 700, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)" } }, "Maybe later")
+  )),
   /* ═══ FIRST-TIME ONBOARDING ═══ */
   showOnboarding && splash === "done" && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508", overflow: "hidden", touchAction: "none" },
@@ -17081,8 +17196,8 @@ function FluxApp() {
             var newSave = Object.assign({}, save);
             newSave[opt.key] = !newSave[opt.key];
             writeSave(newSave);
-          }, style: { width: 44, height: 26, borderRadius: 13, background: val ? "var(--neon)" : "var(--surface2)", border: "1px solid " + (val ? "rgba(139,92,246,0.5)" : "var(--border)"), position: "relative", transition: "background 0.2s" } },
-            /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: val ? 21 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" } })
+          }, style: { width: 44, height: 26, borderRadius: 13, background: val ? "var(--neon)" : "var(--surface2)", border: "1px solid " + (val ? "rgba(139,92,246,0.5)" : "var(--border)"), position: "relative", transition: "background 0.1s" } },
+            /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: val ? 21 : 3, transition: "left 0.1s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" } })
           )
         );
       })
@@ -17580,7 +17695,7 @@ function FluxApp() {
       position: "absolute",
       top: 2,
       left: safeMode ? 24 : 2,
-      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+      transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)",
       boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
     }
   }))), /*#__PURE__*/React.createElement("div", {
@@ -17614,7 +17729,7 @@ function FluxApp() {
       setNotifPrefs(np); saveNotifPrefs(np);
       if (np.enabled && typeof Notification !== "undefined" && Notification.permission === "default") { try { Notification.requestPermission(); } catch(e) {} }
     }, style: { width: 48, height: 28, borderRadius: 14, background: notifPrefs.enabled ? "var(--green)" : "var(--surface)", border: notifPrefs.enabled ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: notifPrefs.enabled ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: notifPrefs.enabled ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
   /* Look & Sound sub-panel button */
   /*#__PURE__*/React.createElement("button", {
     onClick: function () { setShowLookSoundPanel(true); },
@@ -17704,7 +17819,26 @@ function FluxApp() {
       border: "1px solid rgba(255,94,120,0.3)",
       textAlign: "center"
     }
-  }, "\u26A0\uFE0F Clear Data")), /*#__PURE__*/React.createElement("div", {
+  }, "\u26A0\uFE0F Clear Data")),
+  !isStandalone && pwaInstallPrompt && /*#__PURE__*/React.createElement("button", {
+    onClick: function() { setShowInstallModal(true); },
+    style: {
+      width: "100%",
+      padding: "14px 16px",
+      borderRadius: 12,
+      fontSize: 13,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,rgba(192,132,252,0.15),rgba(129,140,248,0.15))",
+      color: "var(--neon)",
+      border: "1px solid rgba(192,132,252,0.3)",
+      marginTop: 12,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    }
+  }, "\uD83D\uDCE5 Install FluxBucks App"),
+  /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       textAlign: "center",
@@ -18105,8 +18239,24 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD0A"),
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Sound Effects")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Plays audio on wins, losses, and actions.")),
-      /*#__PURE__*/React.createElement("button", { onClick: function () { setSoundOn(function (s) { return !s; }); }, style: { width: 48, height: 28, borderRadius: 14, background: soundOn ? "var(--green)" : "var(--surface)", border: soundOn ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: soundOn ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setSoundOn(function (s) { return !s; }); }, style: { width: 48, height: 28, borderRadius: 14, background: soundOn ? "var(--green)" : "var(--surface)", border: soundOn ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.1s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: soundOn ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* Volume sliders — only visible when sound is on */
+    soundOn && /*#__PURE__*/React.createElement("div", { style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 } },
+      [
+        { label: "🎚️ Master Volume", value: masterVolume, set: setMasterVolume },
+        { label: "🎵 Music", value: musicVolume, set: setMusicVolume },
+        { label: "🔊 Sound Effects", value: sfxVolume, set: setSfxVolume }
+      ].map(function(v, i) {
+        return /*#__PURE__*/React.createElement("div", { key: "vol-" + i, style: { marginBottom: i < 2 ? 12 : 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12, color: "var(--text)" } },
+            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 600 } }, v.label),
+            /*#__PURE__*/React.createElement("span", { style: { color: "var(--dim)", fontFamily: "'JetBrains Mono',monospace" } }, Math.round(v.value * 100) + "%")
+          ),
+          /*#__PURE__*/React.createElement("input", { type: "range", min: 0, max: 1, step: 0.05, value: v.value, onChange: function(e) { v.set(parseFloat(e.target.value)); }, style: { width: "100%", accentColor: "var(--neon)", height: 6 } })
+        );
+      })
+    ),
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
     }, /*#__PURE__*/React.createElement("div", null,
@@ -18115,7 +18265,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Auto-Dismiss Level Up")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
     }, /*#__PURE__*/React.createElement("div", null,
@@ -18124,7 +18274,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Reduce Motion")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Disables flashy animations and particle effects for a calmer experience.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setReduceMotion(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: reduceMotion ? "var(--green)" : "var(--surface)", border: reduceMotion ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: reduceMotion ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: reduceMotion ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /*#__PURE__*/React.createElement("div", {
       style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
     }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
@@ -18177,7 +18327,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Quick Play")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Skip game card animations.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setQuickPlay(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: quickPlay ? "var(--green)" : "var(--surface)", border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Tap Outside to Close ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18187,7 +18337,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Tap Outside to Close")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Close popups by tapping the background.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setAllowClickOutsideClose(function (q) { var nv = !q; try { localStorage.setItem("flux_click_close", nv ? "1" : "0"); } catch(e) {} return nv; }); }, style: { width: 48, height: 28, borderRadius: 14, background: allowClickOutsideClose ? "var(--green)" : "var(--surface)", border: allowClickOutsideClose ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: allowClickOutsideClose ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: allowClickOutsideClose ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Vibration ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18197,7 +18347,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Vibration")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Haptic feedback on wins, losses, and actions.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setVibrationOff(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: !vibrationOff ? "var(--green)" : "var(--surface)", border: !vibrationOff ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: !vibrationOff ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: !vibrationOff ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Hide Tap to Resume ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18207,7 +18357,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Hide Tap to Resume")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Hides the text on the idle dim screen.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setHideTapToResume(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: hideTapToResume ? "var(--green)" : "var(--surface)", border: hideTapToResume ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: hideTapToResume ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: hideTapToResume ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Data Saver ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18216,8 +18366,31 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCF6"),
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Data Saver")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Disables background effects and reduces cloud sync. Saves battery and data.")),
-      /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.1s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* ═══ Battery Saver ═══ */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD0B"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Battery Saver")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Caps frame rate at 30fps and disables heavy particle effects.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setBatterySaver(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: batterySaver ? "var(--green)" : "var(--surface)", border: batterySaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.1s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: batterySaver ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* ═══ Haptic Intensity ═══ */
+    !vibrationOff && /*#__PURE__*/React.createElement("div", {
+      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u270B"),
+      /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Haptic Intensity")),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
+        ["light", "medium", "strong"].map(function(level) {
+          var active = hapticIntensity === level;
+          return /*#__PURE__*/React.createElement("button", { key: "hi-" + level, onClick: function() { setHapticIntensity(level); }, style: { flex: 1, padding: "8px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: active ? "var(--neon)" : "var(--surface)", color: active ? "#fff" : "var(--dim)", border: "1px solid " + (active ? "var(--neon)" : "var(--border)"), textTransform: "capitalize" } }, level);
+        })
+      )
+    ),
     /* ═══ Recently Played ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -18227,7 +18400,7 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Recently Played")),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Show recent games row on the hub.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowRecentGames(function (q) { var nv = !q; try { localStorage.setItem("flux_show_recent", nv ? "1" : "0"); } catch(e) {} return nv; }); }, style: { width: 48, height: 28, borderRadius: 14, background: showRecentGames ? "var(--green)" : "var(--surface)", border: showRecentGames ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: showRecentGames ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: showRecentGames ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Idle Mode (AFK) ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }

@@ -1,9 +1,9 @@
 [
   {
-    "id": 52,
+    "id": 53,
     "type": "update",
-    "icon": "✨",
-    "title": "v5.3.8 — UI Overhaul: Back Button, Haptics & Polish",
-    "message": "Back button and swipe-back navigation now works across all menus — settings, profile, leaderboard, shop, account, friends, and games all close properly when you swipe back or press the back button. Button press animation refined with research-backed 120ms timing and depressed inset shadow for a satisfying tactile feel. Haptic feedback added to every button tap (respects vibration toggle). Reduced motion support added for accessibility. Multiple design refinements based on Apple HIG, Material Design 3, and casino UI best practices."
+    "icon": "🚀",
+    "title": "v5.3.9 — Audio Sliders, Battery Saver, Edge-to-Edge & More",
+    "message": "Volume sliders for Master/Music/Sound Effects with live percentage display. Battery Saver mode caps frame rate at 30fps and disables heavy particle effects. Haptic Intensity setting (Light/Medium/Strong). Toggle switches now flip 50% faster. Desktop layout fixed — no more zoom/right-side glitch on monitors, only narrows on truly wide screens. Pull-to-refresh disabled (fewer accidental reloads). Edge-to-edge fullscreen support with safe-area insets for notches and gesture bars. Bank interest notification reformatted — amount in title, casual line in description. PWA icon manifest properly configured for crisp icons on iOS and Android home screens."
   }
 ]
