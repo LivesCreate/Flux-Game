@@ -1,6 +1,6 @@
 # FluxBucks
 
-A browser-based virtual casino & mini-games app with 29 games, built entirely with Claude AI (Opus 4.6).
+A browser-based virtual casino & mini-games app with 29 games, built entirely with Claude AI (Opus 4.6 + Opus 4.7).
 
 **All currency is virtual. No real money is involved.**
 
