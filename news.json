@@ -1,9 +1,9 @@
 [
   {
-    "id": 50,
+    "id": 51,
     "type": "update",
     "icon": "🚀",
-    "title": "v5.3.6 — Leaderboard Pages, Profile Fix & Login Polish",
-    "message": "Leaderboard now has paginated pages (20 per page) with Google-style page numbers at the bottom. Bot names replaced with realistic player-style usernames. Profile popup: tier badge now has its own styled row with colored background, Achieve renamed to Achievements. Quick Setup scroll-locked so background doesn't move. Login: Google sign-in confirmation restored, email autocomplete for password managers, email confirmation preview before submitting, friendly error messages. Localhost known issue documented in About."
+    "title": "v5.3.7 — Profile Overhaul & Leaderboard Realism",
+    "message": "Profile popup completely filled out — stat cards are bigger with larger numbers, plus 4 new cards: Daily Streak, Lifetime XP, Bank Tier, and Combo Best. Quick access buttons for Customize, Friends, and Account added below stats. Leaderboard bot scores dramatically lowered to realistic ranges (top ~500 instead of 50,000). Each bot now has a unique random avatar. Bot names look like real player usernames."
   }
 ]

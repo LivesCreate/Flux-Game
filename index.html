@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.6";
+const VERSION = "v5.3.7";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -1004,11 +1004,13 @@ function getLeaderboardBots(gameId, count) {
     var name = LEADERBOARD_BOT_NAMES[h % LEADERBOARD_BOT_NAMES.length];
     var avatar = LEADERBOARD_BOT_AVATARS[(h >> 4) % LEADERBOARD_BOT_AVATARS.length];
     var tier = LEADERBOARD_BOT_TIERS[(h >> 8) % LEADERBOARD_BOT_TIERS.length];
-    /* Spread scores: top bot ~= 50k, bottom ~= 500 — exponential falloff so
-       ranking ladder feels realistic rather than evenly distributed. */
-    var base = Math.floor(50000 * Math.pow(0.78, i));
-    var jitter = ((h >> 12) % 400) - 200;
-    var score = Math.max(100, base + jitter);
+    /* Spread scores: top bot ~= 500, bottom ~= 15 — realistic for casual play */
+    var base = Math.floor(500 * Math.pow(0.88, i));
+    var jitter = ((h >> 12) % 40) - 20;
+    var score = Math.max(5, base + jitter);
+    /* Unique avatar per bot — mix of people emoji for realism */
+    var BOT_AVATARS = ["😎","🤠","😈","🥸","🤓","😏","🧑‍💻","👨‍🎨","👩‍🚀","🧑‍🔬","👨‍🍳","👩‍🎤","🧙","🦸","🧛","🥷","🤖","👽","💀","🐱","🐺","🦊","🐸","🐵"];
+    avatar = BOT_AVATARS[(h + i * 7) % BOT_AVATARS.length];
     bots.push({
       uid: "bot_" + gameId + "_" + i,
       username: name,
@@ -17279,38 +17281,60 @@ function FluxApp() {
     var winRate = s.gamesPlayed > 0 ? Math.round((s.longestWinStreak > 0 ? s.totalWon / (s.totalWon + s.totalLost) : 0) * 100) : 0;
     var netProfit = (s.totalWon || 0) - (s.totalLost || 0);
     var items = [["🎮", "Games Played", s.gamesPlayed || 0], ["📊", "Win Rate", winRate + "%"], ["🪙", "Chips", chips], ["💰", "Net Profit", (netProfit >= 0 ? "+" : "") + netProfit], ["🏆", "Best Win", "+" + (s.biggestWin || 0)], ["🔥", "Best Streak", s.longestWinStreak || 0], ["⭐", "Achievements", (achievements || []).length + "/" + ACHIEVEMENTS.length]];
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: 6
+        gap: 8
       }
     }, items.map(function (item, i) {
       return /*#__PURE__*/React.createElement("div", {
         key: i,
         style: {
-          padding: "8px 10px",
+          padding: "12px 14px",
           background: "var(--surface2)",
-          borderRadius: 8,
+          borderRadius: 10,
           border: "1px solid var(--border)",
           gridColumn: i === 0 ? "1 / -1" : "auto"
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: 10,
+          fontSize: 11,
           color: "var(--dim)",
           fontWeight: 600,
-          marginBottom: 2
+          marginBottom: 4
         }
       }, item[0] + " " + item[1]), /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: 14,
+          fontSize: 18,
           fontWeight: 800,
           color: i === 3 ? netProfit >= 0 ? "var(--green)" : "var(--accent)" : "var(--neon2)",
           fontFamily: "'JetBrains Mono',monospace"
         }
       }, item[2]));
-    }));
+    })),
+    /* Extra info section */
+    /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 } },
+      /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", background: "rgba(192,132,252,0.06)", borderRadius: 10, border: "1px solid rgba(192,132,252,0.15)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", fontWeight: 600, marginBottom: 4 } }, "📅 Daily Streak"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace" } }, (save.dailyStreak || 0) + " days")),
+      /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", background: "rgba(86,193,255,0.06)", borderRadius: 10, border: "1px solid rgba(86,193,255,0.15)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", fontWeight: 600, marginBottom: 4 } }, "🏅 Lifetime XP"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: "var(--cool)", fontFamily: "'JetBrains Mono',monospace" } }, lifetimeXp || 0)),
+      /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", background: "rgba(56,189,128,0.06)", borderRadius: 10, border: "1px solid rgba(56,189,128,0.15)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", fontWeight: 600, marginBottom: 4 } }, "🏦 Bank Tier"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "var(--green)" } }, getTier(lifetimeXp).name)),
+      /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", background: "rgba(255,207,86,0.06)", borderRadius: 10, border: "1px solid rgba(255,207,86,0.15)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", fontWeight: 600, marginBottom: 4 } }, "🎯 Combo Best"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: "#ffcf56", fontFamily: "'JetBrains Mono',monospace" } }, (save.bestCombo || 0) + "x"))
+    ),
+    /* Quick customize buttons */
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 12 } },
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setShowProfile(false); setShowSettings(true); }, style: { flex: 1, padding: "10px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "🎨 Customize"),
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setShowProfile(false); setShowFriends(true); }, style: { flex: 1, padding: "10px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "👥 Friends"),
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setShowProfile(false); setShowAccount(true); }, style: { flex: 1, padding: "10px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "🔐 Account")
+    ));
   }(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
