@@ -1,9 +1,9 @@
 [
   {
-    "id": 51,
+    "id": 52,
     "type": "update",
-    "icon": "🚀",
-    "title": "v5.3.7 — Profile Overhaul & Leaderboard Realism",
-    "message": "Profile popup completely filled out — stat cards are bigger with larger numbers, plus 4 new cards: Daily Streak, Lifetime XP, Bank Tier, and Combo Best. Quick access buttons for Customize, Friends, and Account added below stats. Leaderboard bot scores dramatically lowered to realistic ranges (top ~500 instead of 50,000). Each bot now has a unique random avatar. Bot names look like real player usernames."
+    "icon": "✨",
+    "title": "v5.3.8 — UI Overhaul: Back Button, Haptics & Polish",
+    "message": "Back button and swipe-back navigation now works across all menus — settings, profile, leaderboard, shop, account, friends, and games all close properly when you swipe back or press the back button. Button press animation refined with research-backed 120ms timing and depressed inset shadow for a satisfying tactile feel. Haptic feedback added to every button tap (respects vibration toggle). Reduced motion support added for accessibility. Multiple design refinements based on Apple HIG, Material Design 3, and casino UI best practices."
   }
 ]

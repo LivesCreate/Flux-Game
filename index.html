@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>FluxBucks</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.15s ease-out, opacity 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out}button:active:not(:disabled){transform:scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}button:disabled{cursor:not-allowed}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 120ms cubic-bezier(.4,0,.2,1), box-shadow 120ms ease, filter 120ms ease;will-change:transform}button:active:not(:disabled){transform:scale(0.96);filter:brightness(0.92);box-shadow:inset 0 2px 4px rgba(0,0,0,0.4)}button:disabled{cursor:not-allowed;opacity:0.35}</style>
 <script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -40,7 +40,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.7";
+const VERSION = "v5.3.8";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -220,9 +220,9 @@ html,body,:root{scrollbar-width:none !important;-ms-overflow-style:none !importa
 @keyframes glowPulse{0%,100%{box-shadow:0 0 8px var(--glow-color,transparent)}50%{box-shadow:0 0 20px var(--glow-color,transparent)}}
 @keyframes goldParticle{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0.3)}}
 @keyframes goldGlow{0%{opacity:0;transform:scale(0.5)}30%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(2)}}
-button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)}
-button:hover:not(:disabled){transform:translateY(-1px) scale(1.02);filter:brightness(1.08)}
-button:active:not(:disabled){transform:translateY(0px) scale(0.96);filter:brightness(1.25);box-shadow:inset 0 0 0 100px rgba(255,255,255,0.08)}
+button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:transform 120ms cubic-bezier(.4,0,.2,1), box-shadow 120ms ease, filter 120ms ease;will-change:transform}
+button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.06)}
+button:active:not(:disabled){transform:scale(0.96);filter:brightness(0.92);box-shadow:inset 0 2px 4px rgba(0,0,0,0.4)}
 button:disabled{cursor:not-allowed;opacity:0.35}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 @keyframes slideUp{from{opacity:0;transform:translateY(24px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -253,7 +253,32 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
 }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 `;
+
+/* ═══ HAPTIC FEEDBACK HELPER ═══ */
+function haptic(pattern) {
+  try {
+    if (typeof pattern === "undefined") pattern = 10;
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  } catch(e) {}
+}
+function hapticWin() { haptic([0, 30, 30, 60]); }
+function hapticLight() { haptic(8); }
+function hapticMedium() { haptic(15); }
+
+/* Global haptic on button tap — lightweight delegation */
+document.addEventListener("touchstart", function(e) {
+  try {
+    if (e.target.closest && e.target.closest("button")) {
+      var s = null;
+      try { s = JSON.parse(localStorage.getItem("flux_save_v3")); } catch(x) {}
+      if (!s || !s.vibrationOff) hapticLight();
+    }
+  } catch(e2) {}
+}, { passive: true });
 
 
 /* ═══════════ SAVE SYSTEM ════════════════════════════════════════ */
@@ -15457,6 +15482,53 @@ function FluxApp() {
   const [friendSearchResults, setFriendSearchResults] = useState([]);
   const [friendSearching, setFriendSearching] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+
+  /* ═══ HISTORY API — BACK BUTTON / SWIPE-BACK SUPPORT ═══ */
+  const _panelHistoryDepth = useRef(0);
+  const _prevPanels = useRef("");
+
+  useEffect(function() {
+    /* Check which panels are open, push/pop history to match */
+    var panels = [showSettings, showProfile, showAchievements, showStats, showInfo,
+      showLeaderboard, showShop, showShareCard, showAccount, showFriends, showWeeklyMissions, !!game];
+    var openCount = panels.filter(Boolean).length;
+    var key = panels.map(function(p) { return p ? "1" : "0"; }).join("");
+    if (key === _prevPanels.current) return;
+    _prevPanels.current = key;
+    if (openCount > _panelHistoryDepth.current) {
+      /* Panel opened — push state */
+      try { history.pushState({ flux: openCount }, ""); } catch(e) {}
+      _panelHistoryDepth.current = openCount;
+    } else if (openCount < _panelHistoryDepth.current) {
+      _panelHistoryDepth.current = openCount;
+    }
+  });
+
+  useEffect(function() {
+    function onPopState(e) {
+      /* Close the topmost panel when user swipes back or presses back */
+      if (showWeeklyMissions) { setShowWeeklyMissions(false); return; }
+      if (showShareCard) { setShowShareCard(false); return; }
+      if (showAchievements) { setShowAchievements(false); return; }
+      if (showStats) { setShowStats(false); return; }
+      if (showInfo) { setShowInfo(false); return; }
+      if (showFriends) { setShowFriends(false); return; }
+      if (showAccount) { setShowAccount(false); return; }
+      if (showLeaderboard) { setShowLeaderboard(false); return; }
+      if (showShop) { setShowShop(false); return; }
+      if (showSettings) { setShowSettings(false); return; }
+      if (showProfile) { setShowProfile(false); return; }
+      if (game) { setGame(null); return; }
+      /* Nothing to close — re-push so we don't leave the page */
+      try { history.pushState({ flux: 0 }, ""); } catch(e) {}
+    }
+    window.addEventListener("popstate", onPopState);
+    /* Push initial state so first back doesn't leave the app */
+    try { history.replaceState({ flux: 0 }, ""); } catch(e) {}
+    return function() { window.removeEventListener("popstate", onPopState); };
+  }, [showSettings, showProfile, showAchievements, showStats, showInfo,
+      showLeaderboard, showShop, showShareCard, showAccount, showFriends,
+      showWeeklyMissions, game]);
   const [viewingFriend, setViewingFriend] = useState(null);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const [dataSaver, setDataSaver] = useState(save.dataSaver || false);
