@@ -10,6 +10,8 @@ A browser-based virtual casino & mini-games app with 29 games, built entirely wi
 
 **Android APK:** Built with Capacitor — sideload the APK for a native app experience. 
 
+An APK Version is avalible but not included in this repository
+
 ## Games (29)
 
 Blackjack · Higher/Lower · Lucky Slots · Coin Ladder · Memory Match · Mines · Plinko · Limbo · Dice · Keno · Crash · Video Poker · Wheel of Fortune · Baccarat · Roulette · Tower Risk · Dragon Tower · Bomb Defuser · Coin Flip · Minesweeper · Chicken Race · Stock Trader · Color Match · Reaction Time · Typing Speed · Card Packs · and more.
