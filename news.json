@@ -1,9 +1,9 @@
 [
   {
-    "id": 53,
+    "id": 54,
     "type": "update",
-    "icon": "🚀",
-    "title": "v5.3.9 — Audio Sliders, Battery Saver, Edge-to-Edge & More",
-    "message": "Volume sliders for Master/Music/Sound Effects with live percentage display. Battery Saver mode caps frame rate at 30fps and disables heavy particle effects. Haptic Intensity setting (Light/Medium/Strong). Toggle switches now flip 50% faster. Desktop layout fixed — no more zoom/right-side glitch on monitors, only narrows on truly wide screens. Pull-to-refresh disabled (fewer accidental reloads). Edge-to-edge fullscreen support with safe-area insets for notches and gesture bars. Bank interest notification reformatted — amount in title, casual line in description. PWA icon manifest properly configured for crisp icons on iOS and Android home screens."
+    "icon": "🔐",
+    "title": "v5.4.0 — Your Devices & Soft-Lock Fix",
+    "message": "New 'Your Devices' section in Account shows every device you're signed in on — name, OS, browser, location, when you first signed in, and when each device was last active. A green 'THIS DEVICE' pill marks the one you're on. Sign out any single device or 'Sign out all other devices' if something looks wrong. The new sign-in alert popup now shows the new device's full details. Fixed a soft-lock bug where the screen could stay scroll-locked after dismissing the new sign-in alert — body styles are now defensively cleared and the popup is properly tracked alongside other overlays. Cleaning up your own session record on Sign Out so it doesn't linger."
   }
 ]

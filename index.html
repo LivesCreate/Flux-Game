@@ -13,19 +13,13 @@
 <meta name="full-screen" content="yes">
 <meta name="browsermode" content="application">
 <meta name="screen-orientation" content="portrait">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-overflow-scrolling:touch;overscroll-behavior:none;overscroll-behavior-y:none}body{min-height:100vh;min-height:100dvh;-webkit-user-select:none;user-select:none}::-webkit-scrollbar{display:none}body{scrollbar-width:none}button{transition:transform 120ms cubic-bezier(.4,0,.2,1), box-shadow 120ms ease, filter 120ms ease;will-change:transform}button:active:not(:disabled){transform:scale(0.96);filter:brightness(0.92);box-shadow:inset 0 2px 4px rgba(0,0,0,0.4)}button:disabled{cursor:not-allowed;opacity:0.35}:root{--sat:env(safe-area-inset-top);--sar:env(safe-area-inset-right);--sab:env(safe-area-inset-bottom);--sal:env(safe-area-inset-left)}</style>
-<script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="react.production.min.js"></script>
+<script>if(typeof React==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"><\/script>');}</script>
+<script src="react-dom.production.min.js"></script>
+<script>if(typeof ReactDOM==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"><\/script>');}</script>
 </head>
 <body>
 <div id="flux-loader" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050508;font-family:-apple-system,BlinkMacSystemFont,sans-serif">
@@ -43,7 +37,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.3.9";
+const VERSION = "v5.4.0";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -244,7 +238,6 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
 
 /* ═══ DESKTOP / LARGE SCREEN SCALING ═══ */
-/* Only apply max-width when screen is BOTH wide AND landscape (true desktop/laptop) */
 @media (min-width: 900px) and (orientation: landscape) {
   #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
 }
@@ -307,7 +300,6 @@ document.addEventListener("touchstart", function(e) {
     }
   } catch(e2) {}
 }, { passive: true });
-
 
 /* ═══════════ SAVE SYSTEM ════════════════════════════════════════ */
 var SAVE_KEY = "flux_save_v3";
@@ -655,35 +647,230 @@ function getDeviceId() {
     return id;
   } catch (e) { return "d_unknown_" + Math.random().toString(36).slice(2, 8); }
 }
-function getDeviceName() {
-  var ua = navigator.userAgent || "";
-  if (/Android/i.test(ua)) return "Android device";
-  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS device";
+function _detectOS(ua) {
+  ua = ua || "";
+  var m;
+  if ((m = ua.match(/Android\s*([\d.]+)/i))) return "Android " + m[1];
+  if (/Android/i.test(ua)) return "Android";
+  if ((m = ua.match(/iPhone OS\s*([\d_]+)/i)) || (m = ua.match(/CPU OS\s*([\d_]+)/i))) return "iOS " + m[1].replace(/_/g, ".");
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
+  if ((m = ua.match(/Mac OS X\s*([\d_]+)/i))) return "macOS " + m[1].replace(/_/g, ".");
+  if (/Mac/i.test(ua)) return "macOS";
+  if ((m = ua.match(/Windows NT\s*([\d.]+)/i))) {
+    var v = { "10.0": "10/11", "6.3": "8.1", "6.2": "8", "6.1": "7" }[m[1]] || m[1];
+    return "Windows " + v;
+  }
+  if (/Windows/i.test(ua)) return "Windows";
+  if (/CrOS/i.test(ua)) return "Chrome OS";
+  if (/Linux/i.test(ua)) return "Linux";
+  return "Unknown OS";
+}
+function _detectBrowser(ua) {
+  ua = ua || "";
+  var m;
+  if (/EdgA?\//i.test(ua) && (m = ua.match(/EdgA?\/([\d.]+)/i))) return "Edge " + m[1].split(".")[0];
+  if (/OPR\/|Opera/i.test(ua) && (m = ua.match(/OPR\/([\d.]+)|Opera\/([\d.]+)/i))) return "Opera " + (m[1] || m[2]).split(".")[0];
+  if (/Firefox/i.test(ua) && (m = ua.match(/Firefox\/([\d.]+)/i))) return "Firefox " + m[1].split(".")[0];
+  if (/SamsungBrowser/i.test(ua) && (m = ua.match(/SamsungBrowser\/([\d.]+)/i))) return "Samsung " + m[1].split(".")[0];
+  if (/CriOS/i.test(ua) && (m = ua.match(/CriOS\/([\d.]+)/i))) return "Chrome iOS " + m[1].split(".")[0];
+  if (/Chrome/i.test(ua) && (m = ua.match(/Chrome\/([\d.]+)/i))) return "Chrome " + m[1].split(".")[0];
+  if (/Safari/i.test(ua) && (m = ua.match(/Version\/([\d.]+).*Safari/i))) return "Safari " + m[1].split(".")[0];
+  if (/Capacitor/i.test(ua)) return "FluxBucks App";
+  return "Browser";
+}
+function _detectDeviceType(ua) {
+  ua = ua || "";
+  if (/iPad|Tablet|PlayBook|Silk/i.test(ua)) return "tablet";
+  if (/(Android|iPhone|iPod|Mobile|BlackBerry|IEMobile|Opera Mini)/i.test(ua)) return "mobile";
+  return "desktop";
+}
+function _detectDeviceName(ua) {
+  ua = ua || "";
+  var m;
+  /* Try specific Android model first (e.g., Pixel 9, SM-G998U) */
+  if (/Android/i.test(ua)) {
+    m = ua.match(/;\s*([^;)]+?)\s+Build\//i) || ua.match(/Android[^;]+;\s*([^;)]+?)\s*[)\/]/i);
+    if (m && m[1]) {
+      var name = m[1].trim().replace(/\s+/g, " ");
+      if (name.length > 0 && name.length < 40 && !/Linux|wv/i.test(name)) return name;
+    }
+    return "Android device";
+  }
+  if (/iPad/i.test(ua)) return "iPad";
+  if (/iPhone/i.test(ua)) return "iPhone";
+  if (/iPod/i.test(ua)) return "iPod";
   if (/Mac/i.test(ua)) return "Mac";
   if (/Windows/i.test(ua)) return "Windows PC";
+  if (/CrOS/i.test(ua)) return "Chromebook";
   if (/Linux/i.test(ua)) return "Linux device";
-  return "a device";
+  return "Unknown device";
 }
+function _detectLocation() {
+  try {
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz) return "Unknown";
+    var parts = tz.split("/");
+    var city = parts[parts.length - 1].replace(/_/g, " ");
+    var region = parts[0] || "";
+    if (region && region !== city) return city + ", " + region.replace(/_/g, " ");
+    return city;
+  } catch(e) { return "Unknown"; }
+}
+function getDeviceInfo() {
+  var ua = navigator.userAgent || "";
+  return {
+    deviceId: getDeviceId(),
+    deviceName: _detectDeviceName(ua),
+    deviceType: _detectDeviceType(ua),
+    os: _detectOS(ua),
+    browser: _detectBrowser(ua),
+    location: _detectLocation()
+  };
+}
+/* Back-compat for any older callers */
+function getDeviceName() { return _detectDeviceName(navigator.userAgent || ""); }
 function fbClaimSession(uid) {
   if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
-  return fbDb.collection("users").doc(uid).collection("sessions").doc("current").set({
-    deviceId: getDeviceId(),
-    deviceName: getDeviceName(),
-    at: firebase.firestore.FieldValue.serverTimestamp()
+  var info = getDeviceInfo();
+  var ts = firebase.firestore.FieldValue.serverTimestamp();
+  return fbDb.collection("users").doc(uid).collection("sessions").doc(info.deviceId).set({
+    deviceId: info.deviceId,
+    deviceName: info.deviceName,
+    deviceType: info.deviceType,
+    os: info.os,
+    browser: info.browser,
+    location: info.location,
+    createdAt: ts,
+    lastActive: ts,
+    revoked: false
+  }, { merge: true }).then(function() {
+    /* Mirror to legacy /current doc so older clients still get the popup signal */
+    try {
+      return fbDb.collection("users").doc(uid).collection("sessions").doc("current").set({
+        deviceId: info.deviceId,
+        deviceName: info.deviceName,
+        at: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch(e) {}
   }).catch(function (e) { console.warn("Session claim failed:", e); });
 }
-function fbWatchSession(uid, onOther) {
+function fbUpdateSessionActivity(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
+  var id = getDeviceId();
+  return fbDb.collection("users").doc(uid).collection("sessions").doc(id).update({
+    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function() { return null; });
+}
+function fbListSessions(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve([]);
+  return fbDb.collection("users").doc(uid).collection("sessions").get().then(function(snap) {
+    var out = [];
+    snap.forEach(function(doc) {
+      if (doc.id === "current") return; /* skip legacy mirror doc */
+      var d = doc.data() || {};
+      out.push({
+        id: doc.id,
+        deviceId: d.deviceId || doc.id,
+        deviceName: d.deviceName || "Unknown device",
+        deviceType: d.deviceType || "desktop",
+        os: d.os || "",
+        browser: d.browser || "",
+        location: d.location || "",
+        createdAt: d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0,
+        lastActive: d.lastActive && d.lastActive.toMillis ? d.lastActive.toMillis() : 0,
+        revoked: !!d.revoked
+      });
+    });
+    out.sort(function(a, b) { return (b.lastActive || 0) - (a.lastActive || 0); });
+    return out;
+  }).catch(function() { return []; });
+}
+function fbRevokeSession(uid, deviceId) {
+  if (!fbAvailable || !fbDb || !uid || !deviceId) return Promise.resolve(null);
+  return fbDb.collection("users").doc(uid).collection("sessions").doc(deviceId).update({
+    revoked: true,
+    revokedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(e) { console.warn("Revoke failed:", e); });
+}
+function fbRevokeAllOtherSessions(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve(0);
+  var myId = getDeviceId();
+  return fbListSessions(uid).then(function(list) {
+    var batch = fbDb.batch();
+    var count = 0;
+    list.forEach(function(s) {
+      if (s.deviceId === myId || s.revoked) return;
+      var ref = fbDb.collection("users").doc(uid).collection("sessions").doc(s.deviceId);
+      batch.update(ref, { revoked: true, revokedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      count++;
+    });
+    if (count === 0) return 0;
+    return batch.commit().then(function() { return count; });
+  }).catch(function() { return 0; });
+}
+function fbDeleteOwnSession(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
+  var id = getDeviceId();
+  return fbDb.collection("users").doc(uid).collection("sessions").doc(id).delete().catch(function() { return null; });
+}
+function fbWatchSessions(uid, callbacks) {
+  /* callbacks: { onNewSignIn(session), onRevoked(), onChange(allSessions) } */
   if (!fbAvailable || !fbDb || !uid) return function () {};
   var myId = getDeviceId();
+  var seenIds = null; /* null until first snapshot */
   try {
-    return fbDb.collection("users").doc(uid).collection("sessions").doc("current").onSnapshot(function (snap) {
-      if (!snap.exists) return;
-      var d = snap.data();
-      if (d && d.deviceId && d.deviceId !== myId) {
-        onOther({ deviceName: d.deviceName || "another device" });
+    return fbDb.collection("users").doc(uid).collection("sessions").onSnapshot(function (snap) {
+      var current = {};
+      var all = [];
+      snap.forEach(function(doc) {
+        if (doc.id === "current") return; /* skip legacy mirror */
+        var d = doc.data() || {};
+        current[doc.id] = d;
+        all.push({
+          id: doc.id,
+          deviceId: d.deviceId || doc.id,
+          deviceName: d.deviceName || "Unknown device",
+          deviceType: d.deviceType || "desktop",
+          os: d.os || "",
+          browser: d.browser || "",
+          location: d.location || "",
+          createdAt: d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0,
+          lastActive: d.lastActive && d.lastActive.toMillis ? d.lastActive.toMillis() : 0,
+          revoked: !!d.revoked
+        });
+      });
+      /* My own session revoked? Sign out. */
+      var mine = current[myId];
+      if (mine && mine.revoked === true && callbacks && callbacks.onRevoked) {
+        try { callbacks.onRevoked(); } catch(e) {}
       }
-    }, function (e) { console.warn("Session watch failed:", e); });
+      /* New sign-in detection: a session that wasn't there last snapshot */
+      if (seenIds !== null && callbacks && callbacks.onNewSignIn) {
+        Object.keys(current).forEach(function(k) {
+          if (k === myId) return;
+          if (!seenIds[k]) {
+            try {
+              callbacks.onNewSignIn({
+                deviceId: k,
+                deviceName: current[k].deviceName || "another device",
+                location: current[k].location || "",
+                os: current[k].os || "",
+                browser: current[k].browser || ""
+              });
+            } catch(e) {}
+          }
+        });
+      }
+      seenIds = current;
+      if (callbacks && callbacks.onChange) {
+        try { callbacks.onChange(all); } catch(e) {}
+      }
+    }, function (e) { console.warn("Sessions watch failed:", e); });
   } catch (e) { console.warn(e); return function () {}; }
+}
+/* Back-compat alias for any earlier callers */
+function fbWatchSession(uid, onOther) {
+  return fbWatchSessions(uid, { onNewSignIn: function(info) { if (onOther) onOther(info); } });
 }
 
 
@@ -1184,9 +1371,7 @@ function getNotifPrefs() {
 function saveNotifPrefs(prefs) {
   try { localStorage.setItem("fluxNotifPrefs", JSON.stringify(prefs)); } catch(e) {}
 }
-/* ═══ NOTIFICATION CHANNELS ═══
-   Each category gets its own Android notification channel so users can
-   toggle them individually in Phone Settings → Apps → FluxBucks → Notifications. */
+/* ═══ NOTIFICATION CHANNELS ═══ */
 var NOTIF_CHANNELS = [
   { id: "flux2_streaks", name: "🔥 Streaks", desc: "Daily streak reminders" },
   { id: "flux2_bank", name: "🏦 Bank Interest", desc: "Passive income earned while away" },
@@ -1222,7 +1407,6 @@ function _fluxCreateChannels() {
     } catch(e) {}
   });
 }
-/* Create channels on first load */
 try { _fluxCreateChannels(); } catch(e) {}
 /* Clean up old channels that were grouped under "Other" */
 try {
@@ -1256,12 +1440,10 @@ try {
 
 function showLocalNotification(title, body, channelId) {
   try {
-    /* If app is in foreground, fire an in-app toast instead */
     if (!document.hidden) {
       if (window._fluxInAppNotify) window._fluxInAppNotify({ title: title, body: body });
       return;
     }
-    /* Path 1 — Capacitor Local Notifications (APK with plugin installed) */
     var cap = _fluxCapNotifs();
     if (cap && cap.schedule) {
       try {
@@ -1278,7 +1460,6 @@ function showLocalNotification(title, body, channelId) {
         return;
       } catch(e) {}
     }
-    /* Path 2 — Web Notification API (GitHub web version) */
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
     var n = new Notification(title, {
@@ -1858,7 +2039,7 @@ var CHANGELOG = [
   changes: ["Renamed News → Update Log, Feedback → Send Feedback, Sign In → Log In, Customize → Gameplay", "Notifications for achievement unlocks, new friends, friend level-ups", "Reduce Motion toggle in Look & Sound", "Streak notification timezone bug fixed"]
 }, {
   ver: "v5.2.3", date: "Apr 2026",
-  changes: ["Major notification fix — gift/challenge notifications were firing for the wrong events (send modal instead of receive)", "Gifts and challenges now polled from Firestore every 30 seconds", "Streak notifies once per day instead of every app open", "Bank interest notification added"]
+  changes: ["Major notification fix — gift/challenge notifications were firing for the wrong events", "Gifts and challenges now polled from Firestore every 30 seconds", "Streak notifies once per day", "Bank interest notification added"]
 }, {
   ver: "v5.2.2", date: "Apr 2026",
   changes: ["Real Android notifications via Capacitor Local Notifications plugin", "Button tap feedback — every button scales and brightens on press", "Notification permission requested via Capacitor on APK"]
@@ -1867,67 +2048,67 @@ var CHANGELOG = [
   changes: ["AFK dim screen tap no longer leaks to games underneath", "Notifications auto-dismiss after 7 seconds", "Tapping notification focuses the app"]
 }, {
   ver: "v5.2.0", date: "Apr 2026",
-  changes: ["In-app notification toasts when app is foregrounded", "Proactive notification permission request on first tap", "Leaderboard rank-drop watcher (5-minute polls)", "Service worker cache trimmed to essentials only", "Known Issues updated for APK notification limitations"]
+  changes: ["In-app notification toasts when app is foregrounded", "Proactive notification permission request on first tap", "Leaderboard rank-drop watcher (5-minute polls)", "Service worker cache trimmed", "Known Issues updated"]
 },
 /* ═══ 5.1.x ═══ */
 {
   ver: "v5.1.21", date: "Apr 2026",
-  changes: ["Leaderboard bot seeding — 12 deterministic bots per game so boards aren't empty", "Signed-out users can browse leaderboards", "Card Themes Buy button normalized"]
+  changes: ["Leaderboard bot seeding — 12 deterministic bots per game", "Signed-out users can browse leaderboards", "Card Themes Buy button normalized"]
 }, {
   ver: "v5.1.20", date: "Apr 2026",
-  changes: ["Settings/Leaderboard/Shop buttons blocked during popups (daily streak, bank interest, AFK, level-up)", "Skip All hidden during AFK", "7-second grace window after bank interest popup dismisses"]
+  changes: ["Settings/Leaderboard/Shop buttons blocked during popups", "Skip All hidden during AFK", "7-second grace window after bank interest popup"]
 }, {
   ver: "v5.1.19", date: "Apr 2026",
-  changes: ["Friend search by username — type a name to find players", "Login session alerts — popup when your account signs in on another device", "Notification bug fix — showLocalNotification was defined but never called"]
+  changes: ["Friend search by username", "Login session alerts", "Notification bug fix"]
 }, {
   ver: "v5.1.18", date: "Apr 2026",
-  changes: ["Baccarat first-play card display fix", "Bomb Defuser hint cost scales to bet (50% of wager)", "Hint button shows cost before buying", "Achievement Skip All synchronized exit animation", "Release countdown banner via optional release.json"]
+  changes: ["Baccarat first-play card display fix", "Bomb Defuser hint cost scales to bet", "Achievement Skip All synchronized exit", "Release countdown banner"]
 }, {
   ver: "v5.1.17", date: "Apr 2026",
-  changes: ["Known Issues refreshed — removed fixed bugs from the list"]
+  changes: ["Known Issues refreshed"]
 }, {
   ver: "v5.1.16", date: "Apr 2026",
-  changes: ["Ghost box bug fixed — Look & Sound and Customize panels now stay inside the settings modal", "Starfield fills full viewport with no black edge gaps", "Help page quick-nav buttons for jumping to sections", "Settings menu consolidated with split-pill buttons", "Settings spacing standardized"]
+  changes: ["Ghost box bug fixed in settings sub-panels", "Starfield fills full viewport", "Help page quick-nav buttons", "Settings consolidated with split-pill buttons"]
 }, {
   ver: "v5.1.15", date: "Apr 2026",
   changes: ["Reverted version label next to Settings title"]
 }, {
   ver: "v5.1.13", date: "Apr 2026",
-  changes: ["React splash screen skipped — app goes straight to hub on launch"]
+  changes: ["Splash screen skipped — straight to hub"]
 }, {
   ver: "v5.1.12", date: "Apr 2026",
-  changes: ["Profile pill lifted above bottom button row", "Tap Outside to Close scope leak fixed — now affects all popups", "Dead code cleanup"]
+  changes: ["Profile pill position fix", "Tap Outside to Close scope leak fixed"]
 },
 /* ═══ 5.0.x ═══ */
 {
   ver: "v5.0.x", date: "Apr 2026",
-  changes: ["Combo streak system and passive income/bank interest", "Weekly missions with progress tracking", "Enhanced stats dashboard", "Accessibility zoom slider", "Leaderboard and friend search foundations", "Login session alerts via Firestore", "Settings UI overhaul with Look & Sound and Gameplay panels", "Signed-out leaderboard browsing"]
+  changes: ["Combo streak system and passive income", "Weekly missions", "Enhanced stats dashboard", "Accessibility zoom slider", "Settings UI overhaul"]
 },
 /* ═══ 4.x ═══ */
 {
   ver: "v4.9.x", date: "Mar 2026",
-  changes: ["Leaderboards with global and friends tabs", "FluxBucks gifting between friends", "Challenge-a-friend system", "Push notification foundations", "Lazy game loading for faster hub", "Plinko web worker for smooth physics", "Coin shop with borders, name colors, card themes", "Referral rewards system", "Developer console (secret 5-tap)"]
+  changes: ["Leaderboards", "Gifting between friends", "Challenge-a-friend", "Lazy game loading", "Coin shop", "Referral rewards", "Developer console"]
 }, {
   ver: "v4.8.0", date: "Mar 2026",
-  changes: ["Firebase integration — Google sign-in, cloud saves", "Friends system with friend codes", "Data merge between local and cloud saves", "Sentry.io crash monitoring"]
+  changes: ["Firebase — Google sign-in, cloud saves", "Friends system with friend codes", "Sentry.io crash monitoring"]
 }, {
   ver: "v4.5.x", date: "Mar 2026",
-  changes: ["Daily challenge system with 32 unique challenge types", "Progress bars and step-by-step tracking", "Golden particle effects on big wins", "Feedback form and changelog page", "Loading tips on splash screen"]
+  changes: ["Daily challenge system", "Progress bars", "Golden particle effects", "Feedback form and changelog"]
 }, {
   ver: "v4.4.0", date: "Mar 2026",
-  changes: ["Share card fixed", "Native share on mobile", "How It Works info page", "FluxBucks branding"]
+  changes: ["Share card fixed", "Native share on mobile", "How It Works page"]
 }, {
   ver: "v4.3.x", date: "Mar 2026",
-  changes: ["Update banner cache clearing", "Level-up softlock fixed", "Main Menu button in settings", "Settings gear always visible in games"]
+  changes: ["Update banner cache clearing", "Level-up softlock fixed", "Main Menu button", "Settings gear always visible"]
 }, {
   ver: "v4.2.x", date: "Mar 2026",
-  changes: ["8 background presets", "40 avatars", "Game card animations", "New sound effects", "Background request form"]
+  changes: ["8 background presets", "40 avatars", "Game card animations", "New sound effects"]
 }, {
   ver: "v4.1.0", date: "Mar 2026",
-  changes: ["XP and leveling system (7 ranks)", "Daily streak with chip bonuses", "Session timer with AFK detection"]
+  changes: ["XP and leveling system (7 ranks)", "Daily streak with chip bonuses", "AFK detection"]
 }, {
   ver: "v4.0.0", date: "Feb 2026",
-  changes: ["26 games total", "Sound system", "5 color themes", "Achievement system", "Share card for stats", "First APK build"]
+  changes: ["26 games total", "Sound system", "5 color themes", "Achievement system", "Share card", "First APK build"]
 }];
 
 /* ═══ XP & LEVEL SYSTEM ═════════════════════════════════════════ */
@@ -15523,39 +15704,16 @@ function FluxApp() {
   const [friendSearching, setFriendSearching] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
 
-  /* ═══ PWA INSTALL PROMPT ═══ */
+  /* ═══ PWA INSTALL PROMPT (mostly inert inside APK WebView) ═══ */
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(function() {
-    try {
-      return window.matchMedia("(display-mode: standalone)").matches ||
-             window.matchMedia("(display-mode: fullscreen)").matches ||
-             window.navigator.standalone === true;
-    } catch(e) { return false; }
-  });
-  useEffect(function() {
-    function onBeforeInstall(e) {
-      e.preventDefault();
-      setPwaInstallPrompt(e);
-    }
-    function onInstalled() {
-      setIsStandalone(true);
-      setPwaInstallPrompt(null);
-    }
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    window.addEventListener("appinstalled", onInstalled);
-    return function() {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
+  const [isStandalone, setIsStandalone] = useState(true); /* APK is always standalone */
 
   /* ═══ HISTORY API — BACK BUTTON / SWIPE-BACK SUPPORT ═══ */
   const _panelHistoryDepth = useRef(0);
   const _prevPanels = useRef("");
 
   useEffect(function() {
-    /* Check which panels are open, push/pop history to match */
     var panels = [showSettings, showProfile, showAchievements, showStats, showInfo,
       showLeaderboard, showShop, showShareCard, showAccount, showFriends, showWeeklyMissions, !!game];
     var openCount = panels.filter(Boolean).length;
@@ -15563,7 +15721,6 @@ function FluxApp() {
     if (key === _prevPanels.current) return;
     _prevPanels.current = key;
     if (openCount > _panelHistoryDepth.current) {
-      /* Panel opened — push state */
       try { history.pushState({ flux: openCount }, ""); } catch(e) {}
       _panelHistoryDepth.current = openCount;
     } else if (openCount < _panelHistoryDepth.current) {
@@ -15573,7 +15730,6 @@ function FluxApp() {
 
   useEffect(function() {
     function onPopState(e) {
-      /* Close the topmost panel when user swipes back or presses back */
       if (showWeeklyMissions) { setShowWeeklyMissions(false); return; }
       if (showShareCard) { setShowShareCard(false); return; }
       if (showAchievements) { setShowAchievements(false); return; }
@@ -15586,11 +15742,9 @@ function FluxApp() {
       if (showSettings) { setShowSettings(false); return; }
       if (showProfile) { setShowProfile(false); return; }
       if (game) { setGame(null); return; }
-      /* Nothing to close — re-push so we don't leave the page */
       try { history.pushState({ flux: 0 }, ""); } catch(e) {}
     }
     window.addEventListener("popstate", onPopState);
-    /* Push initial state so first back doesn't leave the app */
     try { history.replaceState({ flux: 0 }, ""); } catch(e) {}
     return function() { window.removeEventListener("popstate", onPopState); };
   }, [showSettings, showProfile, showAchievements, showStats, showInfo,
@@ -15671,13 +15825,37 @@ function FluxApp() {
     return function () { unsub(); };
   }, [fbReady]);
 
-  /* Watch for other-device sign-ins */
+  /* Watch for other-device sign-ins and remote revocation */
+  const [allSessions, setAllSessions] = useState([]);
   useEffect(function () {
-    if (!fbUser) return;
-    var unwatch = fbWatchSession(fbUser.uid, function (info) {
-      setOtherDeviceAlert({ deviceName: info.deviceName, at: Date.now() });
+    if (!fbUser) { setAllSessions([]); return; }
+    var unwatch = fbWatchSessions(fbUser.uid, {
+      onNewSignIn: function(info) {
+        setOtherDeviceAlert({
+          deviceName: info.deviceName,
+          location: info.location || "",
+          os: info.os || "",
+          browser: info.browser || "",
+          at: Date.now()
+        });
+      },
+      onRevoked: function() {
+        /* This device's session was revoked from another device. Sign out. */
+        try { fbSignOut(); } catch(e) {}
+      },
+      onChange: function(list) { setAllSessions(list); }
     });
     return function () { if (typeof unwatch === "function") unwatch(); };
+  }, [fbUser]);
+
+  /* Heartbeat: keep this session's lastActive timestamp fresh */
+  useEffect(function() {
+    if (!fbUser) return;
+    var iv = setInterval(function() { fbUpdateSessionActivity(fbUser.uid); }, 5 * 60 * 1000);
+    /* Update once on focus too */
+    function onFocus() { fbUpdateSessionActivity(fbUser.uid); }
+    window.addEventListener("focus", onFocus);
+    return function() { clearInterval(iv); window.removeEventListener("focus", onFocus); };
   }, [fbUser]);
 
   /* ═══ SYSTEM NOTIFICATIONS ═══
@@ -15692,7 +15870,6 @@ function FluxApp() {
     if (!notifPrefs.enabled) return;
     if (!showDailyStreak) return;
     if (notifPrefs.streakReminders === false) return;
-    /* Only notify once per calendar day */
     try {
       var d = new Date();
       var today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -15702,7 +15879,6 @@ function FluxApp() {
     } catch(e) {}
     showLocalNotification("🔥 Daily streak ready!", "Claim today's bonus chips.", "flux2_streaks");
   }, [showDailyStreak]);
-  /* Incoming gift poller */
   useEffect(function () {
     if (!fbUser || !notifPrefs.enabled || notifPrefs.gifts === false) return;
     if (!fbAvailable || typeof fbCheckGifts !== "function") return;
@@ -15726,11 +15902,10 @@ function FluxApp() {
         }
       }).catch(function() {});
     }
-    poll(); /* immediate first check */
+    poll();
     var iv = setInterval(poll, 30 * 1000);
     return function () { mounted = false; clearInterval(iv); };
   }, [fbUser, notifPrefs.enabled, notifPrefs.gifts]);
-  /* Incoming challenge poller */
   useEffect(function () {
     if (!fbUser || !notifPrefs.enabled || notifPrefs.challenges === false) return;
     if (!fbAvailable || typeof fbGetChallenges !== "function") return;
@@ -15819,7 +15994,6 @@ function FluxApp() {
           fbGetLeaderboard(gid).then(function (real) {
             var bots = (typeof getLeaderboardBots === "function") ? getLeaderboardBots(gid, 12) : [];
             var merged = mergeLeaderboardWithBots(real, bots);
-            /* Insert player if missing */
             if (!merged.some(function (s) { return s.uid === fbUser.uid; })) {
               merged.push({ uid: fbUser.uid, score: myScore });
               merged.sort(function (a, b) { return (b.score || 0) - (a.score || 0); });
@@ -15829,7 +16003,6 @@ function FluxApp() {
             var key = "flux_lastrank_" + gid;
             var lastRank = parseInt(localStorage.getItem(key) || "0", 10);
             if (rank && lastRank && rank > lastRank) {
-              var diff = rank - lastRank;
               showLocalNotification("📉 You dropped on the leaderboard", "Someone passed you in " + gid + " — now rank #" + rank + " (was #" + lastRank + ")", "flux2_leaderboard");
             }
             if (rank) localStorage.setItem(key, String(rank));
@@ -15837,7 +16010,7 @@ function FluxApp() {
         });
       } catch (e) {}
     }
-    var iv = setInterval(checkRanks, 5 * 60 * 1000); /* every 5 min */
+    var iv = setInterval(checkRanks, 5 * 60 * 1000);
     return function () { clearInterval(iv); };
   }, [fbUser, notifPrefs.enabled]);
 
@@ -15886,7 +16059,12 @@ function FluxApp() {
     });
   }
   function doFbSignOut() {
-    fbSignOut().then(function () {
+    /* Clean up our own session record so it doesn't linger as a stale "signed-in" entry */
+    var uid = fbUser && fbUser.uid;
+    var cleanup = uid ? fbDeleteOwnSession(uid) : Promise.resolve();
+    cleanup.then(function() {
+      return fbSignOut();
+    }).then(function () {
       setFbUser(null);
       setFbLastSync(null);
       setFbError(null);
@@ -16392,7 +16570,7 @@ function FluxApp() {
   useEffect(function () {
     try {
       var anyOpen = false;
-      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup; } catch(e) { anyOpen = false; }
+      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert; } catch(e) { anyOpen = false; }
       if (document.body) {
         document.body.style.overflow = anyOpen ? "hidden" : "";
         document.body.style.position = anyOpen ? "fixed" : "";
@@ -16409,7 +16587,7 @@ function FluxApp() {
         if (document.documentElement) { document.documentElement.style.overflow = ""; }
       } catch(e) {}
     };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup]);
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert]);
 
   // Check safe mode achievement
   /* ═══ POPUP SAFETY SYSTEM ═══ */
@@ -16427,6 +16605,7 @@ function FluxApp() {
     setShowCustomize(false); setShowResetConfirm(false); setShowToastPicker(false);
     setShowThemePicker(false); setShowAvatarPicker(false); setShowBgPicker(false);
     setShowLookSoundPanel(false); setShowBgRequest(false); setShowReferral(false);
+    setOtherDeviceAlert(null);
     setGame(null);
     try {
       document.body.style.overflow = "";
@@ -16440,7 +16619,7 @@ function FluxApp() {
   }
   useEffect(function() {
     var anyOpen = false;
-    try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup; } catch(e) {}
+    try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert; } catch(e) {}
     if (anyOpen) {
       /* Safety: reset any root transforms that could push popups off-screen */
       try {
@@ -16458,7 +16637,7 @@ function FluxApp() {
       if (_safetyTimer.current) { clearTimeout(_safetyTimer.current); _safetyTimer.current = null; }
     }
     return function() { if (_safetyTimer.current) clearTimeout(_safetyTimer.current); };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup]);
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert]);
 
 
   useEffect(function () {
@@ -16602,7 +16781,6 @@ function FluxApp() {
       setTimeout(function() {
         setChips(function(c) { return c + net; });
         try { playSound("streak"); } catch(e) {}
-        /* Still fire Android notification if app is backgrounded */
         if (document.hidden) {
           showLocalNotification("🏦 +" + net + " chips · Bank interest", "Earned while you were away. Tap to play.", "flux2_bank");
         }
@@ -16796,12 +16974,12 @@ function FluxApp() {
     forceWin
   };
   /* Feature 6: Lazy game loading via registry */
-  var _anyOverlay = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showShareCard || showWeeklyMissions;
+  var _anyOverlay = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showShareCard || showWeeklyMissions || !!otherDeviceAlert;
   var _anyOverlayFull = _anyOverlay || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || !!showPassivePopup;
   /* Blocking popups — the ones that should gate Settings/Leaderboard/Shop buttons
      and suppress the visual AFK popup. Per user spec: buttons look normal but do
      nothing while any of these are visible. */
-  var _blockingPopup = showDailyStreak || !!showPassivePopup || !!levelUpData || !!debtPopup || showAFK || afkDarken || !!giftTarget || !!challengeTarget;
+  var _blockingPopup = showDailyStreak || !!showPassivePopup || !!levelUpData || !!debtPopup || showAFK || afkDarken || !!giftTarget || !!challengeTarget || !!otherDeviceAlert;
   function tryOpenPanel(opener) {
     if (_blockingPopup) return; /* no-op while a blocking popup is visible */
     opener();
@@ -17130,43 +17308,6 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", marginBottom: 14 } }, showPassivePopup.tier + " tier \u00B7 " + showPassivePopup.mult + "x multiplier \u00B7 " + showPassivePopup.hours + "h away"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--neon)", fontWeight: 700 } }, "Tap anywhere to collect"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 8 } }, "Tip: Check in daily to avoid balance decay!"))),
-  /* ═══ PWA INSTALL MODAL ═══ */
-  showInstallModal && pwaInstallPrompt && /*#__PURE__*/React.createElement("div", {
-    style: { position: "fixed", inset: 0, zIndex: 998, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", padding: 20 },
-    onClick: function(e) { if (e.target === e.currentTarget) setShowInstallModal(false); }
-  }, /*#__PURE__*/React.createElement("div", { style: { background: "linear-gradient(180deg, #14141A 0%, #1C1C24 100%)", border: "1px solid var(--border)", borderRadius: 20, padding: 24, maxWidth: 380, width: "100%", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)" } },
-    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginBottom: 18 } },
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 56, marginBottom: 10, filter: "drop-shadow(0 0 20px rgba(192,132,252,0.5))" } }, "\u2726"),
-      /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 4 } }, "Install FluxBucks"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)" } }, "Get the full experience")
-    ),
-    /*#__PURE__*/React.createElement("div", { style: { padding: 14, background: "rgba(192,132,252,0.06)", borderRadius: 12, border: "1px solid rgba(192,132,252,0.15)", marginBottom: 14 } },
-      [
-        ["\uD83D\uDE80", "Faster loading", "Works offline once installed"],
-        ["\uD83D\uDD14", "Native notifications", "Get bank interest and gift alerts"],
-        ["\uD83C\uDFAE", "Full-screen play", "No browser bars in your way"],
-        ["\uD83D\uDCF1", "Home screen icon", "Launch like a native app"]
-      ].map(function(b, i) {
-        return /*#__PURE__*/React.createElement("div", { key: "ben-" + i, style: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < 3 ? 10 : 0 } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18 } }, b[0]),
-          /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--text)" } }, b[1]),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)" } }, b[2])
-          )
-        );
-      })
-    ),
-    /*#__PURE__*/React.createElement("button", { onClick: function() {
-      if (pwaInstallPrompt) {
-        pwaInstallPrompt.prompt();
-        pwaInstallPrompt.userChoice.then(function() {
-          setPwaInstallPrompt(null);
-          setShowInstallModal(false);
-        });
-      }
-    }, style: { width: "100%", padding: "14px 20px", borderRadius: 12, fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", marginBottom: 8, boxShadow: "0 4px 16px rgba(192,132,252,0.4)" } }, "\uD83D\uDCE5 Install Now"),
-    /*#__PURE__*/React.createElement("button", { onClick: function() { setShowInstallModal(false); }, style: { width: "100%", padding: "10px 20px", borderRadius: 12, fontSize: 12, fontWeight: 700, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)" } }, "Maybe later")
-  )),
   /* ═══ FIRST-TIME ONBOARDING ═══ */
   showOnboarding && splash === "done" && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508", overflow: "hidden", touchAction: "none" },
@@ -17819,26 +17960,7 @@ function FluxApp() {
       border: "1px solid rgba(255,94,120,0.3)",
       textAlign: "center"
     }
-  }, "\u26A0\uFE0F Clear Data")),
-  !isStandalone && pwaInstallPrompt && /*#__PURE__*/React.createElement("button", {
-    onClick: function() { setShowInstallModal(true); },
-    style: {
-      width: "100%",
-      padding: "14px 16px",
-      borderRadius: 12,
-      fontSize: 13,
-      fontWeight: 700,
-      background: "linear-gradient(135deg,rgba(192,132,252,0.15),rgba(129,140,248,0.15))",
-      color: "var(--neon)",
-      border: "1px solid rgba(192,132,252,0.3)",
-      marginTop: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, "\uD83D\uDCE5 Install FluxBucks App"),
-  /*#__PURE__*/React.createElement("div", {
+  }, "\u26A0\uFE0F Clear Data")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       textAlign: "center",
@@ -18712,17 +18834,32 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)" } }, inAppNotif.body)), otherDeviceAlert && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(24px)" }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { background: "var(--surface)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 18, padding: 24, width: "88%", maxWidth: 340, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
+    style: { background: "var(--surface)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 18, padding: 24, width: "88%", maxWidth: 360, textAlign: "center", animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)" }
   }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 40, marginBottom: 10 } }, "\uD83D\uDD10"),
     /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 8 } }, "New sign-in detected"),
-    /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: "var(--dim)", lineHeight: 1.6, marginBottom: 16 } }, "Your account was just signed in on ", /*#__PURE__*/React.createElement("b", { style: { color: "var(--text)" } }, otherDeviceAlert.deviceName), ". If this wasn't you, sign out and change your password."),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: "var(--dim)", lineHeight: 1.6, marginBottom: 12 } }, "Your account was just signed in on a new device:"),
+    /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", marginBottom: 14, textAlign: "left" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 2 } }, otherDeviceAlert.deviceName || "Unknown device"),
+      (otherDeviceAlert.os || otherDeviceAlert.browser) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)" } }, [otherDeviceAlert.os, otherDeviceAlert.browser].filter(Boolean).join(" \u00B7 ")),
+      otherDeviceAlert.location && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", marginTop: 2 } }, "\uD83D\uDCCD " + otherDeviceAlert.location),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginTop: 4 } }, "Just now")
+    ),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.5, marginBottom: 14 } }, "If this wasn't you, sign that device out from Account \u2192 Your Devices."),
     /*#__PURE__*/React.createElement("button", {
-      onClick: function () { setOtherDeviceAlert(null); },
-      style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", marginRight: 8 }
+      onClick: function () {
+        setOtherDeviceAlert(null);
+        /* Defensive: clear any stuck scroll lock styles even if effect cleanup misfires */
+        try { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; document.body.style.top = ""; if (document.documentElement) document.documentElement.style.overflow = ""; } catch(e) {}
+      },
+      style: { padding: "10px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", marginRight: 8 }
     }, "It was me"),
     /*#__PURE__*/React.createElement("button", {
-      onClick: function () { setOtherDeviceAlert(null); if (fbSignOut) fbSignOut(); },
-      style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#ff5e78,#f39c12)", color: "#fff", border: "none" } }, "Sign me out"))), lossToast && /*#__PURE__*/React.createElement("div", {
+      onClick: function () {
+        setOtherDeviceAlert(null);
+        try { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; document.body.style.top = ""; if (document.documentElement) document.documentElement.style.overflow = ""; } catch(e) {}
+        setShowAccount(true);
+      },
+      style: { padding: "10px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#ff5e78,#f39c12)", color: "#fff", border: "none" } }, "Review devices"))), lossToast && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       top: 80,
@@ -18895,6 +19032,92 @@ function FluxApp() {
             ),
             isAnon && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--accent)", marginTop: 6, lineHeight: 1.4 } }, "Guest accounts can't link providers. Sign in with Google or Email to enable linking."),
             !isAnon && totalLinked >= 2 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--green)", marginTop: 6 } }, "You can sign in with any linked account. Your data stays the same.")
+          );
+        })()
+      ),
+      /* ═══ YOUR DEVICES — Google-style sessions list ═══ */
+      /*#__PURE__*/React.createElement("div", { style: { padding: 12, background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase" } }, "\uD83D\uDCF1 Your Devices"),
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            fbListSessions(fbUser.uid).then(function(list) { setAllSessions(list); });
+          }, style: { padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)" } }, "\uD83D\uDD04 Refresh")
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 10, lineHeight: 1.5 } }, "Where you're signed in. Sign out any device you don't recognize."),
+        (function() {
+          /* Relative time helper — local to this section */
+          function timeAgo(ms) {
+            if (!ms) return "Unknown";
+            var sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+            if (sec < 30) return "Just now";
+            if (sec < 60) return sec + " seconds ago";
+            var min = Math.floor(sec / 60);
+            if (min < 60) return min + (min === 1 ? " minute ago" : " minutes ago");
+            var hr = Math.floor(min / 60);
+            if (hr < 24) return hr + (hr === 1 ? " hour ago" : " hours ago");
+            var day = Math.floor(hr / 24);
+            if (day === 1) return "Yesterday";
+            if (day < 7) return day + " days ago";
+            try { return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }); }
+            catch(e) { return day + " days ago"; }
+          }
+          function fullDateTime(ms) {
+            if (!ms) return "Unknown";
+            try { return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+            catch(e) { return ""; }
+          }
+          function deviceIcon(type) {
+            if (type === "mobile") return "\uD83D\uDCF1";
+            if (type === "tablet") return "\uD83D\uDCF7"; /* approximate */
+            return "\uD83D\uDCBB";
+          }
+          var myId = getDeviceId();
+          var list = (allSessions || []).filter(function(s) { return !s.revoked; });
+          if (list.length === 0) {
+            return /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", padding: "10px 0", textAlign: "center" } }, "Loading sessions\u2026");
+          }
+          var hasOthers = list.some(function(s) { return s.deviceId !== myId; });
+          return /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+              list.map(function(s) {
+                var isCurrent = s.deviceId === myId;
+                return /*#__PURE__*/React.createElement("div", { key: s.id, style: { padding: 10, background: "var(--surface)", borderRadius: 10, border: "1px solid " + (isCurrent ? "rgba(74,222,128,0.3)" : "var(--border)") } },
+                  /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 10 } },
+                    /*#__PURE__*/React.createElement("div", { style: { fontSize: 22, lineHeight: 1, flexShrink: 0, marginTop: 2 } }, deviceIcon(s.deviceType)),
+                    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 } },
+                        /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)" } }, s.deviceName),
+                        isCurrent && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "var(--green)", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", padding: "1px 6px", borderRadius: 999, letterSpacing: 0.5 } }, "THIS DEVICE")
+                      ),
+                      (s.os || s.browser) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, [s.os, s.browser].filter(Boolean).join(" \u00B7 ")),
+                      s.location && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 1 } }, "\uD83D\uDCCD " + s.location),
+                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: isCurrent ? "var(--green)" : "var(--dim)", marginTop: 2 } }, isCurrent ? "Active now" : "Last active " + timeAgo(s.lastActive)),
+                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 1, opacity: 0.7 } }, "First seen \u00B7 " + fullDateTime(s.createdAt))
+                    )
+                  ),
+                  !isCurrent && /*#__PURE__*/React.createElement("button", {
+                    onClick: function() {
+                      if (confirm("Sign out " + s.deviceName + "? That device will be signed out the next time it opens FluxBucks.")) {
+                        fbRevokeSession(fbUser.uid, s.deviceId).then(function() {
+                          fbListSessions(fbUser.uid).then(function(l) { setAllSessions(l); });
+                        });
+                      }
+                    },
+                    style: { marginTop: 8, padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "rgba(255,94,120,0.1)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.3)", width: "100%" }
+                  }, "\uD83D\uDEAA Sign out this device")
+                );
+              })
+            ),
+            hasOthers && /*#__PURE__*/React.createElement("button", {
+              onClick: function() {
+                if (confirm("Sign out all other devices? Only this device will stay signed in.")) {
+                  fbRevokeAllOtherSessions(fbUser.uid).then(function(n) {
+                    fbListSessions(fbUser.uid).then(function(l) { setAllSessions(l); });
+                  });
+                }
+              },
+              style: { marginTop: 10, padding: "8px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "rgba(255,94,120,0.08)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.25)", width: "100%" }
+            }, "\uD83D\uDEAA Sign out all other devices")
           );
         })()
       ),
@@ -19098,12 +19321,29 @@ function Wrap({
   }, children));
 }
 
+/* Dynamic Sentry loading for APK (non-blocking) */
+setTimeout(function() {
+  try {
+    if (!navigator.onLine) return;
+    var s = document.createElement("script");
+    s.src = "https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js";
+    s.crossOrigin = "anonymous";
+    s.async = true;
+    s.onload = function() {
+      try {
+        if (typeof Sentry !== "undefined" && Sentry.init) {
+          console.log("Sentry loaded dynamically");
+        }
+      } catch(e) {}
+    };
+    document.head.appendChild(s);
+  } catch(e) {}
+}, 3000);
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 try { var _fl = document.getElementById("flux-loader"); if (_fl) { _fl.style.transition = "opacity 0.3s"; _fl.style.opacity = "0"; setTimeout(function() { _fl.remove(); }, 300); } } catch(e) {}
 /* One-time cleanup: remove any stuck zoom from old accessibilityZoom feature */
 try { var _r = document.getElementById("root"); if (_r) { _r.style.transform = ""; _r.style.transformOrigin = ""; _r.style.width = ""; _r.style.minHeight = ""; } var _s = localStorage.getItem("flux_save_v3"); if (_s && _s.indexOf("accessibilityZoom") >= 0) { var _d = JSON.parse(_s); delete _d.accessibilityZoom; localStorage.setItem("flux_save_v3", JSON.stringify(_d)); } } catch(e) {}
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js').then(function(r) { console.log('SW registered'); }).catch(function(e) { console.warn('SW failed:', e); }); }
 </script>
 
 
