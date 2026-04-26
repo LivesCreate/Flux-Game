@@ -37,7 +37,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.4.2";
+const VERSION = "v5.4.3";
 
 /* ═══ VERSION-CHANGE CLEANUP ═══
    Runs synchronously at app startup, before React mounts. If the user just
@@ -277,17 +277,19 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
 
 /* ═══ DESKTOP / LARGE SCREEN SCALING ═══
-   Use flex centering on body for desktop landscape — bulletproof against
-   any inline transforms or position:fixed scroll-lock states that can
-   defeat margin:auto centering. The matrix/starfield canvases are
-   position:fixed inset:0 so they continue to fill the full viewport
-   behind the centered #root. */
+   No max-width constraint, no centering. The layout flows naturally at full
+   width like a regular page. For big screens we use the CSS zoom property
+   to scale the entire UI proportionally — buttons get bigger, layout
+   positioning stays identical. CSS zoom is supported in all modern
+   browsers (Chromium, Safari, Firefox 126+). */
 @media (min-width: 900px) and (orientation: landscape) {
-  body { display: flex; justify-content: center; align-items: stretch; min-height: 100vh; min-height: 100dvh; }
-  #root { max-width: 540px; width: 100%; margin: 0 !important; min-height: 100vh; min-height: 100dvh; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); flex-shrink: 0; }
+  body { zoom: 1.15; }
 }
-@media (min-width: 1440px) and (orientation: landscape) {
-  #root { max-width: 600px; }
+@media (min-width: 1280px) and (orientation: landscape) {
+  body { zoom: 1.25; }
+}
+@media (min-width: 1600px) and (orientation: landscape) {
+  body { zoom: 1.35; }
 }
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
@@ -16652,13 +16654,16 @@ function FluxApp() {
 
   
   /* Soft-lock recovery: ref tracking whether any overlay is currently open.
-     The 20-frame guardian below reads this to decide whether a stuck body
+     The continuous janitor below reads this to decide whether a stuck
      scroll-lock is legitimate or stale. Updated by the scroll-lock effect. */
   var _anyOverlayOpenRef = useRef(false);
 
   /* Mount-time defensive cleanup: clear any scroll-lock styles that survived
      from a previous session (PWA standalone resume) or version. The scroll-
-     lock effect below will reapply them if an overlay actually opens. */
+     lock effect below will reapply them if an overlay actually opens.
+     Critically, this also removes the legacy body position:fixed/top:0
+     styles from older versions that caused the soft-lock — those styles
+     are persistent on iOS standalone PWAs across reloads. */
   useEffect(function() {
     try {
       if (document.body) {
@@ -16671,18 +16676,22 @@ function FluxApp() {
     } catch(e) {}
   }, []);
 
-  /* Scroll lock when overlays open */
+  /* Scroll lock when overlays open.
+     IMPORTANT: We deliberately do NOT use `body { position: fixed; top: 0 }`
+     anymore. That approach is the standard iOS-Safari trick to prevent
+     scroll-bleed, but it has a catastrophic failure mode: if anything
+     interferes with the cleanup (interrupted React render, React state
+     desync, page resume), the body stays pinned to the top of the viewport
+     forever and the user can only see the first screenful of content. The
+     only recovery was wiping app data. We now use `html { overflow: hidden }`
+     instead — same scroll-prevention effect, but if it gets stuck the
+     layout doesn't break (you just temporarily can't scroll), and the
+     continuous janitor below catches and clears any stuck state. */
   useEffect(function () {
     try {
       var anyOpen = false;
       try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert || showOnboarding; } catch(e) { anyOpen = false; }
       _anyOverlayOpenRef.current = anyOpen;
-      if (document.body) {
-        document.body.style.overflow = anyOpen ? "hidden" : "";
-        document.body.style.position = anyOpen ? "fixed" : "";
-        document.body.style.width = anyOpen ? "100%" : "";
-        document.body.style.top = anyOpen ? "0" : "";
-      }
       if (document.documentElement) {
         document.documentElement.style.overflow = anyOpen ? "hidden" : "";
       }
@@ -16695,33 +16704,31 @@ function FluxApp() {
     };
   }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert, showOnboarding]);
 
-  /* ═══ 20-FRAME SOFT-LOCK GUARDIAN ═══
-     For the first 20 frames after splash transitions to "done", check every
-     frame: is the body scroll-locked even though no overlay is open? If yes,
-     clear the lock — this auto-recovers from a stuck soft-lock state without
-     needing the user to wipe their app data. After 20 frames we stop. The
-     normal scroll-lock effect handles every case after that. */
+  /* ═══ CONTINUOUS SCROLL-LOCK JANITOR ═══
+     Runs every 2 seconds for the entire app lifetime (not just startup).
+     If html or body has overflow:hidden / position:fixed but no overlay
+     is actually open in React state, clear the lock styles. This catches
+     soft-locks regardless of when they happen — startup, mid-session,
+     after a popup misbehaves, after a React error boundary trip, etc. */
   useEffect(function() {
-    if (splash !== "done") return;
-    var frames = 0;
-    var raf = null;
-    function tick() {
-      if (frames++ >= 20) return;
+    var iv = setInterval(function() {
       try {
-        var bodyLocked = document.body && (document.body.style.overflow === "hidden" || document.body.style.position === "fixed");
-        if (bodyLocked && !_anyOverlayOpenRef.current) {
-          document.body.style.overflow = "";
-          document.body.style.position = "";
-          document.body.style.width = "";
-          document.body.style.top = "";
+        if (_anyOverlayOpenRef.current) return; /* Lock is legitimate */
+        var bodyStuck = document.body && (document.body.style.overflow === "hidden" || document.body.style.position === "fixed");
+        var htmlStuck = document.documentElement && document.documentElement.style.overflow === "hidden";
+        if (bodyStuck || htmlStuck) {
+          if (document.body) {
+            document.body.style.overflow = "";
+            document.body.style.position = "";
+            document.body.style.width = "";
+            document.body.style.top = "";
+          }
           if (document.documentElement) document.documentElement.style.overflow = "";
         }
       } catch(e) {}
-      raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return function() { if (raf) cancelAnimationFrame(raf); };
-  }, [splash]);
+    }, 2000);
+    return function() { clearInterval(iv); };
+  }, []);
 
   /* Show "just updated" notice if the version-change block at startup detected
      a version bump. This appears once after splash completes, then disappears. */

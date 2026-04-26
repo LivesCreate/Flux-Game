@@ -1,9 +1,9 @@
 [
   {
-    "id": 56,
+    "id": 57,
     "type": "update",
-    "icon": "🩹",
-    "title": "v5.4.2 — Soft-Lock Fix, Auto Cache Clear, Desktop Centering & Extras Menu",
-    "message": "Major reliability pass. Whenever you update to a newer version, all stale caches are cleared automatically and you'll see a brief 'Updated to vX.X.X' notice. A 20-frame guardian runs on every app launch — if a menu was scroll-locked from a previous session but isn't actually open anymore, the lock is released so you can scroll again (no more wiping app data to recover). The onboarding screen no longer leaves a phantom scroll lock when dismissed. Desktop layout now uses bulletproof flex centering — content stays in the middle of wide screens instead of slamming to one side. Achievement notifications now show the friendly name and icon (e.g. '🛡️ Playing it Safe — Enable Safe Mode') instead of the raw id. Safe Mode moved from the top of Settings into a new ✨ Extras submenu — out of sight unless you want it. Cache name bumped so service workers reload cleanly."
+    "icon": "🔓",
+    "title": "v5.4.3 — Real Soft-Lock Fix & Desktop Layout Reset",
+    "message": "The actual cause of the soft-lock bug found and removed: when a popup opened, the body was getting position:fixed pinned to the top of the viewport — if cleanup ever misfired, the page stayed pinned forever and you could only see the first screenful of content. Now using a much safer html-only overflow:hidden lock that can't break the layout. A continuous janitor runs every 2 seconds — if a scroll-lock is stuck while no overlay is open, it clears it automatically. Should never need to wipe app data again. Desktop layout reset: removed the 540px-wide centered mobile-style frame entirely. Page now flows naturally at full width like a regular site. For larger screens, the entire UI scales up proportionally (1.15× at 900px+, 1.25× at 1280px+, 1.35× at 1600px+) so buttons stay comfortable to click without breaking the layout."
   }
 ]
