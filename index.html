@@ -37,7 +37,46 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.4.1";
+const VERSION = "v5.4.2";
+
+/* ═══ VERSION-CHANGE CLEANUP ═══
+   Runs synchronously at app startup, before React mounts. If the user just
+   updated to a new version, aggressively clear stale state: SW caches
+   (the SW activate hook also handles this, but we double up), force the
+   service worker to refetch, and clear any body scroll-lock styles that
+   may have survived a PWA standalone resume from the old version. The
+   show-toast flag is read after splash completes. */
+try {
+  var _prevVer = null;
+  try { _prevVer = localStorage.getItem("flux_last_version"); } catch(e) {}
+  if (_prevVer && _prevVer !== VERSION) {
+    if (typeof caches !== "undefined") {
+      try {
+        caches.keys().then(function(names) {
+          names.forEach(function(name) { try { caches.delete(name); } catch(e) {} });
+        }).catch(function() {});
+      } catch(e) {}
+    }
+    if (navigator && navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      try {
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+          if (reg && reg.update) { try { reg.update(); } catch(e) {} }
+        }).catch(function() {});
+      } catch(e) {}
+    }
+    try {
+      if (document.body) {
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
+        document.body.style.top = "";
+      }
+      if (document.documentElement) document.documentElement.style.overflow = "";
+    } catch(e) {}
+    window.__fluxJustUpdated = { from: _prevVer, to: VERSION };
+  }
+  try { localStorage.setItem("flux_last_version", VERSION); } catch(e) {}
+} catch(e) {}
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -237,12 +276,18 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 .flux-panel-enter{animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1)}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
 
-/* ═══ DESKTOP / LARGE SCREEN SCALING ═══ */
+/* ═══ DESKTOP / LARGE SCREEN SCALING ═══
+   Use flex centering on body for desktop landscape — bulletproof against
+   any inline transforms or position:fixed scroll-lock states that can
+   defeat margin:auto centering. The matrix/starfield canvases are
+   position:fixed inset:0 so they continue to fill the full viewport
+   behind the centered #root. */
 @media (min-width: 900px) and (orientation: landscape) {
-  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+  body { display: flex; justify-content: center; align-items: stretch; min-height: 100vh; min-height: 100dvh; }
+  #root { max-width: 540px; width: 100%; margin: 0 !important; min-height: 100vh; min-height: 100dvh; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 120px rgba(192,132,252,0.03); border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); flex-shrink: 0; }
 }
 @media (min-width: 1440px) and (orientation: landscape) {
-  #root { max-width: 540px; }
+  #root { max-width: 600px; }
 }
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
@@ -15615,6 +15660,7 @@ function FluxApp() {
   const [lifetimeXp, setLifetimeXp] = useState(save.lifetimeXp || save.xp || 0);
   const [perGameWins, setPerGameWins] = useState(save.perGameWins || {});
   const [showCustomize, setShowCustomize] = useState(false);
+  const [showExtras, setShowExtras] = useState(false);
   const [clickParticles, setClickParticles] = useState([]);
   const [lossToast, setLossToast] = useState(null);
   const lossToastTimer = useRef(null);
@@ -15973,7 +16019,14 @@ function FluxApp() {
       var newCount = achievements.length - prev;
       var latest = achievements[achievements.length - 1];
       var title = newCount === 1 ? "🏆 Achievement unlocked!" : "🏆 " + newCount + " achievements unlocked!";
-      var body = newCount === 1 && latest ? (typeof latest === "string" ? latest : latest.name || "New achievement") : "Open the achievements page to see them.";
+      var def = null;
+      try {
+        var lookupId = (typeof latest === "string") ? latest : (latest && latest.id);
+        if (lookupId) def = ACHIEVEMENTS.find(function(a) { return a.id === lookupId; });
+      } catch(e) {}
+      var body = newCount === 1
+        ? (def ? (def.icon ? def.icon + " " : "") + def.name + (def.desc ? " — " + def.desc : "") : "Open the achievements page to see it.")
+        : "Open the achievements page to see them.";
       showLocalNotification(title, body, "flux2_achievements");
     }
     localStorage.setItem("flux_last_ach_count", String(achievements.length));
@@ -16598,11 +16651,32 @@ function FluxApp() {
   }
 
   
+  /* Soft-lock recovery: ref tracking whether any overlay is currently open.
+     The 20-frame guardian below reads this to decide whether a stuck body
+     scroll-lock is legitimate or stale. Updated by the scroll-lock effect. */
+  var _anyOverlayOpenRef = useRef(false);
+
+  /* Mount-time defensive cleanup: clear any scroll-lock styles that survived
+     from a previous session (PWA standalone resume) or version. The scroll-
+     lock effect below will reapply them if an overlay actually opens. */
+  useEffect(function() {
+    try {
+      if (document.body) {
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
+        document.body.style.top = "";
+      }
+      if (document.documentElement) document.documentElement.style.overflow = "";
+    } catch(e) {}
+  }, []);
+
   /* Scroll lock when overlays open */
   useEffect(function () {
     try {
       var anyOpen = false;
-      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert; } catch(e) { anyOpen = false; }
+      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert || showOnboarding; } catch(e) { anyOpen = false; }
+      _anyOverlayOpenRef.current = anyOpen;
       if (document.body) {
         document.body.style.overflow = anyOpen ? "hidden" : "";
         document.body.style.position = anyOpen ? "fixed" : "";
@@ -16619,7 +16693,52 @@ function FluxApp() {
         if (document.documentElement) { document.documentElement.style.overflow = ""; }
       } catch(e) {}
     };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert]);
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert, showOnboarding]);
+
+  /* ═══ 20-FRAME SOFT-LOCK GUARDIAN ═══
+     For the first 20 frames after splash transitions to "done", check every
+     frame: is the body scroll-locked even though no overlay is open? If yes,
+     clear the lock — this auto-recovers from a stuck soft-lock state without
+     needing the user to wipe their app data. After 20 frames we stop. The
+     normal scroll-lock effect handles every case after that. */
+  useEffect(function() {
+    if (splash !== "done") return;
+    var frames = 0;
+    var raf = null;
+    function tick() {
+      if (frames++ >= 20) return;
+      try {
+        var bodyLocked = document.body && (document.body.style.overflow === "hidden" || document.body.style.position === "fixed");
+        if (bodyLocked && !_anyOverlayOpenRef.current) {
+          document.body.style.overflow = "";
+          document.body.style.position = "";
+          document.body.style.width = "";
+          document.body.style.top = "";
+          if (document.documentElement) document.documentElement.style.overflow = "";
+        }
+      } catch(e) {}
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return function() { if (raf) cancelAnimationFrame(raf); };
+  }, [splash]);
+
+  /* Show "just updated" notice if the version-change block at startup detected
+     a version bump. This appears once after splash completes, then disappears. */
+  useEffect(function() {
+    if (splash !== "done") return;
+    var u = window.__fluxJustUpdated;
+    if (!u) return;
+    try {
+      setInAppNotif({
+        title: "\u2728 Updated to " + u.to,
+        body: "Cache cleared. Welcome back!"
+      });
+    } catch(e) {}
+    try { delete window.__fluxJustUpdated; } catch(e) { window.__fluxJustUpdated = null; }
+    var t = setTimeout(function() { try { setInAppNotif(null); } catch(e) {} }, 3500);
+    return function() { clearTimeout(t); };
+  }, [splash]);
 
   // Check safe mode achievement
   /* ═══ POPUP SAFETY SYSTEM ═══ */
@@ -16637,6 +16756,7 @@ function FluxApp() {
     setShowCustomize(false); setShowResetConfirm(false); setShowToastPicker(false);
     setShowThemePicker(false); setShowAvatarPicker(false); setShowBgPicker(false);
     setShowLookSoundPanel(false); setShowBgRequest(false); setShowReferral(false);
+    setShowExtras(false);
     setOtherDeviceAlert(null);
     setGame(null);
     try {
@@ -17343,8 +17463,7 @@ function FluxApp() {
   /* ═══ FIRST-TIME ONBOARDING ═══ */
   showOnboarding && splash === "done" && /*#__PURE__*/React.createElement("div", {
     style: { position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "#050508", overflow: "hidden", touchAction: "none" },
-    onTouchMove: function(e) { e.preventDefault(); },
-    ref: function(el) { if (el) document.body.style.overflow = "hidden"; }
+    onTouchMove: function(e) { e.preventDefault(); }
   }, /*#__PURE__*/React.createElement("div", { style: { width: "92%", maxWidth: 400, textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)", maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-y" },
     onTouchMove: function(e) { e.stopPropagation(); }
   },
@@ -17776,7 +17895,7 @@ function FluxApp() {
       animation: "slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)",
       backdropFilter: "blur(16px)"
     }
-  }, !showResetConfirm && !showToastPicker && !showThemePicker && !showAvatarPicker && !showBgPicker && !showLookSoundPanel && !showCustomize && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, !showResetConfirm && !showToastPicker && !showThemePicker && !showAvatarPicker && !showBgPicker && !showLookSoundPanel && !showCustomize && !showExtras && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -17805,8 +17924,10 @@ function FluxApp() {
       alignItems: "center",
       justifyContent: "center"
     }
-  }, "✕")), /*#__PURE__*/React.createElement("div", {
+  }, "✕")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () { setShowExtras(true); },
     style: {
+      width: "100%",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -17814,64 +17935,17 @@ function FluxApp() {
       background: "var(--surface2)",
       borderRadius: 12,
       border: "1px solid var(--border)",
-      marginBottom: 10
+      marginBottom: 10,
+      color: "var(--text)",
+      textAlign: "left"
     }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🛡️"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Safe Mode")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4,
-      maxWidth: 200
-    }
-  }, "Skill-based games only.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      var next = !safeMode;
-      setSafeMode(next);
-      if (next) setGame(null);
-      setModeKey(function (k) {
-        return k + 1;
-      });
-    },
-    style: {
-      width: 48,
-      height: 28,
-      borderRadius: 14,
-      background: safeMode ? "var(--green)" : "var(--surface)",
-      border: safeMode ? "2px solid var(--green)" : "2px solid var(--border)",
-      position: "relative",
-      transition: "all 0.3s",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 20,
-      height: 20,
-      borderRadius: "50%",
-      background: "#fff",
-      position: "absolute",
-      top: 2,
-      left: safeMode ? 24 : 2,
-      transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
-    }
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "✨"),
+    /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Extras"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, "Safe Mode and other options")
+    )
+  ), /*#__PURE__*/React.createElement("span", { style: { fontSize: 16, color: "var(--dim)" } }, "›")), /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", gap: 6, alignItems: "center", padding: "8px 10px", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 8 }
   }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, "👤"),
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, position: "relative", minWidth: 0 } },
@@ -18457,6 +18531,35 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].name : "Cosmic Stars")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowBgPicker(true); setShowLookSoundPanel(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "Change"))),
 ),
+  /* ═══ EXTRAS SUB-PANEL ═══ */
+  showExtras && /*#__PURE__*/React.createElement("div", { style: { animation: "slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1)", width: "100%" } },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+        /*#__PURE__*/React.createElement("button", { onClick: function () { setShowExtras(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
+        /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\u2728 Extras")),
+      /*#__PURE__*/React.createElement("button", { onClick: closeSettings, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.5, marginBottom: 12, padding: "0 4px" } }, "Optional features tucked away. None of these affect normal play."),
+    /* Safe Mode toggle (moved here from main settings) */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDEE1\uFE0F"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Safe Mode")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Skill-based games only. Hides games of pure chance.")),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: function () {
+          var next = !safeMode;
+          setSafeMode(next);
+          if (next) setGame(null);
+          setModeKey(function (k) { return k + 1; });
+        },
+        style: { width: 48, height: 28, borderRadius: 14, background: safeMode ? "var(--green)" : "var(--surface)", border: safeMode ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: safeMode ? 24 : 2, transition: "left 0.15s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }
+      }))
+    )
+  ),
   /* ═══ CUSTOMIZE SUB-PANEL ═══ */
   showCustomize && /*#__PURE__*/React.createElement("div", { style: { animation: "slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1)", width: "100%" } },
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },

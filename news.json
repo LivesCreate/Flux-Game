@@ -1,9 +1,9 @@
 [
   {
-    "id": 55,
+    "id": 56,
     "type": "update",
-    "icon": "🔐",
-    "title": "v5.4.1 — Outdated Device Auto-Cleanup",
-    "message": "Each device now records which app version it's running. The Your Devices list shows the version next to each device — green if it's on the latest, amber if it's outdated. Any device on an older version that hasn't updated within 5 days is automatically signed out from your account for security. Heads up: A device only appears in Your Devices once it has loaded v5.4.0 or later — older sessions with no version data also get auto-cleaned after 5 days. Browser/PWA users update automatically on next visit; APK users need to install the new APK to keep their session active. When this device is signed out remotely, you'll see a brief notice before it happens."
+    "icon": "🩹",
+    "title": "v5.4.2 — Soft-Lock Fix, Auto Cache Clear, Desktop Centering & Extras Menu",
+    "message": "Major reliability pass. Whenever you update to a newer version, all stale caches are cleared automatically and you'll see a brief 'Updated to vX.X.X' notice. A 20-frame guardian runs on every app launch — if a menu was scroll-locked from a previous session but isn't actually open anymore, the lock is released so you can scroll again (no more wiping app data to recover). The onboarding screen no longer leaves a phantom scroll lock when dismissed. Desktop layout now uses bulletproof flex centering — content stays in the middle of wide screens instead of slamming to one side. Achievement notifications now show the friendly name and icon (e.g. '🛡️ Playing it Safe — Enable Safe Mode') instead of the raw id. Safe Mode moved from the top of Settings into a new ✨ Extras submenu — out of sight unless you want it. Cache name bumped so service workers reload cleanly."
   }
 ]
