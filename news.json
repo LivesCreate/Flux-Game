@@ -2,8 +2,8 @@
   {
     "id": 58,
     "type": "update",
-    "icon": "🔓",
-    "title": "v5.4.4 — Real Scroll-Lock Fix & Desktop at Native Size",
-    "message": "Scroll-lock has been completely rewritten. Previously it tried to lock during every popup (settings, leaderboard, shop, account, achievements, etc) and any tiny error in cleanup would leave you stuck. Now it ONLY locks during active gameplay and first-time onboarding — never for menus or popups. The continuous janitor still runs every 2 seconds as a safety net, force-clearing any stuck state. Desktop reset to native 100% size: removed all CSS zoom and transform scaling. Page now renders at its natural size on desktop just like before all the layout experiments — no more zoomed-in cramped UI. If existing users open this version with stuck lock styles from a previous version, the mount-time cleanup clears them on first load."
+    "icon": "🎯",
+    "title": "v5.4.5 — Real Scroll-Lock Fix",
+    "message": "Found the actual cause: the main app wrapper had overflow:hidden hardcoded, blocking all scrolling regardless of any other logic. Changed to overflow-x:hidden only. Pages now scroll normally on every device. Sorry for the runaround over the last few versions."
   }
 ]

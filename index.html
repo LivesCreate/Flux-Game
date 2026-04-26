@@ -37,7 +37,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.4.4";
+const VERSION = "v5.4.5";
 
 /* ═══ VERSION-CHANGE CLEANUP ═══
    Runs synchronously at app startup, before React mounts. If the user just
@@ -19434,7 +19434,7 @@ function Wrap({
       color: "var(--text)",
       fontFamily: "'Outfit',sans-serif",
       position: "relative",
-      overflow: "hidden",
+      overflowX: "hidden",
       paddingTop: "env(safe-area-inset-top, 0px)",
       paddingBottom: "env(safe-area-inset-bottom, 0px)"
     }
