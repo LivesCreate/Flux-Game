@@ -1,9 +1,9 @@
 [
   {
-    "id": 54,
+    "id": 55,
     "type": "update",
     "icon": "🔐",
-    "title": "v5.4.0 — Your Devices & Soft-Lock Fix",
-    "message": "New 'Your Devices' section in Account shows every device you're signed in on — name, OS, browser, location, when you first signed in, and when each device was last active. A green 'THIS DEVICE' pill marks the one you're on. Sign out any single device or 'Sign out all other devices' if something looks wrong. The new sign-in alert popup now shows the new device's full details. Fixed a soft-lock bug where the screen could stay scroll-locked after dismissing the new sign-in alert — body styles are now defensively cleared and the popup is properly tracked alongside other overlays. Cleaning up your own session record on Sign Out so it doesn't linger."
+    "title": "v5.4.1 — Outdated Device Auto-Cleanup",
+    "message": "Each device now records which app version it's running. The Your Devices list shows the version next to each device — green if it's on the latest, amber if it's outdated. Any device on an older version that hasn't updated within 5 days is automatically signed out from your account for security. Heads up: A device only appears in Your Devices once it has loaded v5.4.0 or later — older sessions with no version data also get auto-cleaned after 5 days. Browser/PWA users update automatically on next visit; APK users need to install the new APK to keep their session active. When this device is signed out remotely, you'll see a brief notice before it happens."
   }
 ]

@@ -37,7 +37,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.4.0";
+const VERSION = "v5.4.1";
 
 /* Initialize cross-component flag for click-outside-to-close (read by sub-component popups; synced from App state) */
 try { window._allowClickOutsideClose = localStorage.getItem("flux_click_close") === "1"; } catch(e) { window._allowClickOutsideClose = false; }
@@ -740,6 +740,7 @@ function fbClaimSession(uid) {
     os: info.os,
     browser: info.browser,
     location: info.location,
+    appVersion: (typeof VERSION !== "undefined" ? VERSION : ""),
     createdAt: ts,
     lastActive: ts,
     revoked: false
@@ -758,7 +759,8 @@ function fbUpdateSessionActivity(uid) {
   if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
   var id = getDeviceId();
   return fbDb.collection("users").doc(uid).collection("sessions").doc(id).update({
-    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+    lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+    appVersion: (typeof VERSION !== "undefined" ? VERSION : "")
   }).catch(function() { return null; });
 }
 function fbListSessions(uid) {
@@ -776,6 +778,7 @@ function fbListSessions(uid) {
         os: d.os || "",
         browser: d.browser || "",
         location: d.location || "",
+        appVersion: d.appVersion || "",
         createdAt: d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0,
         lastActive: d.lastActive && d.lastActive.toMillis ? d.lastActive.toMillis() : 0,
         revoked: !!d.revoked
@@ -834,6 +837,7 @@ function fbWatchSessions(uid, callbacks) {
           os: d.os || "",
           browser: d.browser || "",
           location: d.location || "",
+          appVersion: d.appVersion || "",
           createdAt: d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0,
           lastActive: d.lastActive && d.lastActive.toMillis ? d.lastActive.toMillis() : 0,
           revoked: !!d.revoked
@@ -15840,13 +15844,41 @@ function FluxApp() {
         });
       },
       onRevoked: function() {
-        /* This device's session was revoked from another device. Sign out. */
-        try { fbSignOut(); } catch(e) {}
+        /* This device's session was revoked from another device. Show a brief notice, then sign out. */
+        try { setInAppNotif({ title: "\uD83D\uDD12 Signed out", body: "This device was signed out from another device for security." }); } catch(e) {}
+        setTimeout(function() {
+          try { fbSignOut(); } catch(e) {}
+        }, 2000);
       },
       onChange: function(list) { setAllSessions(list); }
     });
     return function () { if (typeof unwatch === "function") unwatch(); };
   }, [fbUser]);
+
+  /* Auto-revoke outdated devices: any session not on the current VERSION
+     whose lastActive is older than 5 days gets revoked. The 5-day window
+     gives PWA users plenty of time to update on their next visit and gives
+     APK users a generous grace period to install the new APK. Devices
+     missing the appVersion field entirely (pre-v5.4.0 sessions) are
+     treated as outdated. */
+  const _autoRevokeAttempted = useRef({});
+  useEffect(function() {
+    if (!fbUser || !allSessions || allSessions.length === 0) return;
+    var myId = getDeviceId();
+    var fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+    var cutoff = Date.now() - fiveDaysMs;
+    allSessions.forEach(function(s) {
+      if (s.deviceId === myId) return;
+      if (s.revoked) return;
+      var isOutdated = !s.appVersion || s.appVersion !== VERSION;
+      var isStale = s.lastActive && s.lastActive < cutoff;
+      if (!isOutdated || !isStale) return;
+      /* Don't spam revoke calls — only attempt once per session per app load */
+      if (_autoRevokeAttempted.current[s.deviceId]) return;
+      _autoRevokeAttempted.current[s.deviceId] = true;
+      fbRevokeSession(fbUser.uid, s.deviceId);
+    });
+  }, [fbUser, allSessions]);
 
   /* Heartbeat: keep this session's lastActive timestamp fresh */
   useEffect(function() {
@@ -19043,7 +19075,7 @@ function FluxApp() {
             fbListSessions(fbUser.uid).then(function(list) { setAllSessions(list); });
           }, style: { padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)" } }, "\uD83D\uDD04 Refresh")
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 10, lineHeight: 1.5 } }, "Where you're signed in. Sign out any device you don't recognize."),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 10, lineHeight: 1.5 } }, "Where you're signed in. Sign out any device you don't recognize. Devices on older app versions auto-sign-out after 5 days of inactivity for security."),
         (function() {
           /* Relative time helper — local to this section */
           function timeAgo(ms) {
@@ -19081,18 +19113,27 @@ function FluxApp() {
             /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
               list.map(function(s) {
                 var isCurrent = s.deviceId === myId;
-                return /*#__PURE__*/React.createElement("div", { key: s.id, style: { padding: 10, background: "var(--surface)", borderRadius: 10, border: "1px solid " + (isCurrent ? "rgba(74,222,128,0.3)" : "var(--border)") } },
+                var isOutdated = !s.appVersion || s.appVersion !== VERSION;
+                /* Days remaining before auto-cleanup, only shown for outdated remote devices */
+                var fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+                var daysSinceActive = s.lastActive ? Math.floor((Date.now() - s.lastActive) / (24 * 60 * 60 * 1000)) : 0;
+                var daysLeft = isOutdated && !isCurrent ? Math.max(0, 5 - daysSinceActive) : null;
+                return /*#__PURE__*/React.createElement("div", { key: s.id, style: { padding: 10, background: "var(--surface)", borderRadius: 10, border: "1px solid " + (isCurrent ? "rgba(74,222,128,0.3)" : isOutdated ? "rgba(251,191,36,0.3)" : "var(--border)") } },
                   /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 10 } },
                     /*#__PURE__*/React.createElement("div", { style: { fontSize: 22, lineHeight: 1, flexShrink: 0, marginTop: 2 } }, deviceIcon(s.deviceType)),
                     /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                       /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 } },
                         /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)" } }, s.deviceName),
-                        isCurrent && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "var(--green)", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", padding: "1px 6px", borderRadius: 999, letterSpacing: 0.5 } }, "THIS DEVICE")
+                        isCurrent && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "var(--green)", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", padding: "1px 6px", borderRadius: 999, letterSpacing: 0.5 } }, "THIS DEVICE"),
+                        /*#__PURE__*/React.createElement("span", {
+                          style: { fontSize: 9, fontWeight: 700, color: isOutdated ? "#fbbf24" : "var(--green)", background: isOutdated ? "rgba(251,191,36,0.12)" : "rgba(74,222,128,0.08)", border: "1px solid " + (isOutdated ? "rgba(251,191,36,0.3)" : "rgba(74,222,128,0.2)"), padding: "1px 6px", borderRadius: 999, letterSpacing: 0.5, fontFamily: "'JetBrains Mono',monospace" }
+                        }, s.appVersion || "OLD")
                       ),
                       (s.os || s.browser) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, [s.os, s.browser].filter(Boolean).join(" \u00B7 ")),
                       s.location && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 1 } }, "\uD83D\uDCCD " + s.location),
                       /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: isCurrent ? "var(--green)" : "var(--dim)", marginTop: 2 } }, isCurrent ? "Active now" : "Last active " + timeAgo(s.lastActive)),
-                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 1, opacity: 0.7 } }, "First seen \u00B7 " + fullDateTime(s.createdAt))
+                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", marginTop: 1, opacity: 0.7 } }, "First seen \u00B7 " + fullDateTime(s.createdAt)),
+                      isOutdated && !isCurrent && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "#fbbf24", marginTop: 4, padding: "4px 8px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 6 } }, daysLeft > 0 ? "\u26A0\uFE0F Outdated \u00B7 auto-signs out in " + daysLeft + (daysLeft === 1 ? " day" : " days") : "\u26A0\uFE0F Outdated \u00B7 auto-signing out now")
                     )
                   ),
                   !isCurrent && /*#__PURE__*/React.createElement("button", {
