@@ -37,7 +37,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.4.3";
+const VERSION = "v5.4.4";
 
 /* ═══ VERSION-CHANGE CLEANUP ═══
    Runs synchronously at app startup, before React mounts. If the user just
@@ -277,20 +277,12 @@ button:disabled{cursor:not-allowed;opacity:0.35}
 .flux-card-hover{transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.25s ease}
 
 /* ═══ DESKTOP / LARGE SCREEN SCALING ═══
-   No max-width constraint, no centering. The layout flows naturally at full
-   width like a regular page. For big screens we use the CSS zoom property
-   to scale the entire UI proportionally — buttons get bigger, layout
-   positioning stays identical. CSS zoom is supported in all modern
-   browsers (Chromium, Safari, Firefox 126+). */
-@media (min-width: 900px) and (orientation: landscape) {
-  body { zoom: 1.15; }
-}
-@media (min-width: 1280px) and (orientation: landscape) {
-  body { zoom: 1.25; }
-}
-@media (min-width: 1600px) and (orientation: landscape) {
-  body { zoom: 1.35; }
-}
+   No zoom, no transforms, no max-width centering frame. Page renders at
+   its natural mobile-first size on ALL screens including desktop. The
+   user has explicitly rejected zoom-based scaling because it breaks
+   the layout. Future scaling for huge screens (if ever needed) should
+   use targeted media queries that bump font-size and padding on
+   specific elements only — never zoom or transform. */
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { transform: translateY(-1px) scale(1.02); filter: brightness(1.1); cursor: pointer; }
 }
@@ -16653,17 +16645,14 @@ function FluxApp() {
   }
 
   
-  /* Soft-lock recovery: ref tracking whether any overlay is currently open.
-     The continuous janitor below reads this to decide whether a stuck
-     scroll-lock is legitimate or stale. Updated by the scroll-lock effect. */
+  /* Soft-lock recovery: ref tracking whether scroll-lock should currently
+     be active. The continuous janitor reads this to clear stuck states. */
   var _anyOverlayOpenRef = useRef(false);
 
   /* Mount-time defensive cleanup: clear any scroll-lock styles that survived
-     from a previous session (PWA standalone resume) or version. The scroll-
-     lock effect below will reapply them if an overlay actually opens.
-     Critically, this also removes the legacy body position:fixed/top:0
-     styles from older versions that caused the soft-lock — those styles
-     are persistent on iOS standalone PWAs across reloads. */
+     from a previous session (PWA standalone resume) or previous version.
+     This is critical for users coming from v5.4.x where scroll-lock was
+     applied to many popups and could get stuck. */
   useEffect(function() {
     try {
       if (document.body) {
@@ -16676,40 +16665,46 @@ function FluxApp() {
     } catch(e) {}
   }, []);
 
-  /* Scroll lock when overlays open.
-     IMPORTANT: We deliberately do NOT use `body { position: fixed; top: 0 }`
-     anymore. That approach is the standard iOS-Safari trick to prevent
-     scroll-bleed, but it has a catastrophic failure mode: if anything
-     interferes with the cleanup (interrupted React render, React state
-     desync, page resume), the body stays pinned to the top of the viewport
-     forever and the user can only see the first screenful of content. The
-     only recovery was wiping app data. We now use `html { overflow: hidden }`
-     instead — same scroll-prevention effect, but if it gets stuck the
-     layout doesn't break (you just temporarily can't scroll), and the
-     continuous janitor below catches and clears any stuck state. */
+  /* ═══ MINIMAL SCROLL-LOCK ═══
+     Only locks during ACTIVE gameplay and FIRST-TIME onboarding.
+     Does NOT lock for settings, leaderboard, shop, account, friends,
+     achievements, popups, or any other overlay. The user spent many
+     versions debugging soft-lock bugs caused by over-locking. Modal
+     popups already use position:fixed inset:0 with full backdrops —
+     they cover the page visually. We don't need body lock for them.
+     Uses html overflow:hidden only — never body position:fixed. */
   useEffect(function () {
     try {
-      var anyOpen = false;
-      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup || !!otherDeviceAlert || showOnboarding; } catch(e) { anyOpen = false; }
-      _anyOverlayOpenRef.current = anyOpen;
+      var shouldLock = !!game || showOnboarding;
+      _anyOverlayOpenRef.current = shouldLock;
       if (document.documentElement) {
-        document.documentElement.style.overflow = anyOpen ? "hidden" : "";
+        document.documentElement.style.overflow = shouldLock ? "hidden" : "";
+      }
+      /* Always clear legacy body styles defensively */
+      if (document.body) {
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
+        document.body.style.top = "";
       }
     } catch(e) {}
     return function () {
       try {
-        if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; document.body.style.top = ""; }
-        if (document.documentElement) { document.documentElement.style.overflow = ""; }
+        if (document.documentElement) document.documentElement.style.overflow = "";
+        if (document.body) {
+          document.body.style.overflow = "";
+          document.body.style.position = "";
+          document.body.style.width = "";
+          document.body.style.top = "";
+        }
       } catch(e) {}
     };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup, otherDeviceAlert, showOnboarding]);
+  }, [game, showOnboarding]);
 
   /* ═══ CONTINUOUS SCROLL-LOCK JANITOR ═══
-     Runs every 2 seconds for the entire app lifetime (not just startup).
-     If html or body has overflow:hidden / position:fixed but no overlay
-     is actually open in React state, clear the lock styles. This catches
-     soft-locks regardless of when they happen — startup, mid-session,
-     after a popup misbehaves, after a React error boundary trip, etc. */
+     Runs every 2 seconds. If scroll-lock is on but no game/onboarding is
+     active, force-clear all lock styles. This is the safety net that
+     catches any edge case where styles get stuck. */
   useEffect(function() {
     var iv = setInterval(function() {
       try {
